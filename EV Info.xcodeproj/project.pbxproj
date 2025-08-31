@@ -29,9 +29,33 @@
 		523CDEFA2E61DE200083BB63 /* EV InfoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "EV InfoUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		521435FE2E62BD67004520C6 /* Exceptions for "EV Info" folder in "EV Info" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				ContentView.swift.copy,
+			);
+			target = 523CDEDF2E61DE1F0083BB63 /* EV Info */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+		521435FF2E62BD67004520C6 /* Exceptions for "EV Info" folder in "Compile Sources" phase from "EV Info" target */ = {
+			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
+			buildPhase = 523CDEDC2E61DE1F0083BB63 /* Sources */;
+			membershipExceptions = (
+				ContentView.swift.copy,
+			);
+		};
+/* End PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		523CDEE22E61DE1F0083BB63 /* EV Info */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				521435FE2E62BD67004520C6 /* Exceptions for "EV Info" folder in "EV Info" target */,
+				521435FF2E62BD67004520C6 /* Exceptions for "EV Info" folder in "Compile Sources" phase from "EV Info" target */,
+			);
 			path = "EV Info";
 			sourceTree = "<group>";
 		};
@@ -396,8 +420,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"EV Info/Preview Content\"";
+				DEVELOPMENT_TEAM = 7PWA4B7TSB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "EV-Info-Info.plist";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to connect to your car’s OBD-II device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -424,8 +451,11 @@
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_ASSET_PATHS = "\"EV Info/Preview Content\"";
+				DEVELOPMENT_TEAM = 7PWA4B7TSB;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "EV-Info-Info.plist";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "This app uses Bluetooth to connect to your car’s OBD-II device.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
