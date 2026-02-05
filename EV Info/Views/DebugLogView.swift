@@ -9,18 +9,23 @@ import SwiftUI
 
 struct DebugLogView: View {
     @ObservedObject var logger: Logger
-    
+    @ObservedObject var connection: BLEConnection
+
     var body: some View {
         VStack(alignment: .leading, spacing: 5) {
             HStack {
                 Text("Debug Log")
                     .font(.headline)
                 Spacer()
-                Text("Level: \(logger.logLevel.rawValue)")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                
+                Picker("Log Level", selection: $logger.logLevel) {
+                    ForEach(LogLevel.allCases, id: \.self) { level in
+                        Text(level.rawValue).tag(level)
+                    }
+                }
+                .pickerStyle(MenuPickerStyle())
+                .font(.caption)
             }
-            .padding(.bottom, 5)
             
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 2) {
@@ -37,5 +42,11 @@ struct DebugLogView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.gray.opacity(0.1))
         .cornerRadius(10)
+        
+        Button("Check Status") {
+            connection.checkBluetoothStatus()
+        }
+        .buttonStyle(.bordered)
+        .font(.caption)
     }
 }

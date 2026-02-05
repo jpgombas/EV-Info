@@ -1,10 +1,3 @@
-//
-//  VehicleData.swift
-//  EV Info
-//
-//  Created by Jason on 8/30/25.
-//
-
 import Foundation
 
 struct VehicleData {
@@ -14,6 +7,8 @@ struct VehicleData {
     var power: Double = 0.0
     var efficiency: Double = 0.0
     var stateOfCharge: Double = 0.0
+    var distance: Double = 0.0
+    var longdistance: Double = 0.0
     
     mutating func updatePower() {
         power = batteryCurrent * voltage / 1000.0
@@ -27,5 +22,11 @@ struct VehicleData {
     mutating func updatePowerAndEfficiency() {
         updatePower()
         updateEfficiency()
+    }
+    
+    mutating func updateDistance(timeInterval: TimeInterval) {
+        // Convert speed from mph to miles per second, then multiply by time interval
+        let milesPerSecond = speed / 3600.0
+        distance += milesPerSecond * timeInterval
     }
 }

@@ -64,7 +64,7 @@ class OBD2Parser {
         let distanceMiles = Double(distanceKm) * 0.621371
         
         logger.log(.data, "Distance: \(Int(distanceMiles)) mi")
-        return .distance(distanceMiles)
+        return .longdistance(distanceMiles)
     }
     // MARK: - Current
     private func parseBatteryCurrent(_ cleanText: String) -> OBD2ParseResult? {
@@ -143,7 +143,7 @@ class OBD2Parser {
 
 enum OBD2ParseResult {
     case speed(Double)
-    case distance(Double)
+    case longdistance(Double)
     case batteryCurrent(Double)
     case voltage(Double)
     case stateOfCharge(Double)

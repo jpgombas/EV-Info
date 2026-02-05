@@ -36,22 +36,6 @@ struct ConnectionControlsView: View {
                 .buttonStyle(.bordered)
                 .disabled(!connection.isConnected)
             }
-            
-            HStack {
-                Button("Check Status") {
-                    connection.checkBluetoothStatus()
-                }
-                .buttonStyle(.bordered)
-                .font(.caption)
-                
-                Picker("Log Level", selection: $logger.logLevel) {
-                    ForEach(LogLevel.allCases, id: \.self) { level in
-                        Text(level.rawValue).tag(level)
-                    }
-                }
-                .pickerStyle(MenuPickerStyle())
-                .font(.caption)
-            }
         }
     }
 }

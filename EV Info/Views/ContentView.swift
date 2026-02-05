@@ -7,39 +7,65 @@
 
 import SwiftUI
 
+enum AppView: String, CaseIterable {
+    case dashboard = "Dashboard"
+    case details = "Details"
+    case settings = "Settings"
+}
+
 struct ContentView: View {
     @StateObject private var logger = Logger()
     @StateObject private var connection: BLEConnection
     @StateObject private var controller: OBD2Controller
+    @State private var selectedView: AppView = .dashboard
     
-    init() {
+    let dataStore: DataStore
+    let syncManager: SyncManager
+    
+    init(dataStore: DataStore, syncManager: SyncManager) {
         let logger = Logger()
         let connection = BLEConnection(logger: logger)
         let parser = OBD2Parser(logger: logger)
-        let controller = OBD2Controller(connection: connection, parser: parser, logger: logger)
+        let controller = OBD2Controller(connection: connection, parser: parser, logger: logger, dataStore: dataStore)
         
         self._logger = StateObject(wrappedValue: logger)
         self._connection = StateObject(wrappedValue: connection)
         self._controller = StateObject(wrappedValue: controller)
+        
+        self.dataStore = dataStore
+        self.syncManager = syncManager
     }
     
     var body: some View {
         NavigationView {
-            VStack(spacing: 20) {
-                ConnectionStatusView(connectionStatus: connection.connectionStatus, isConnected: connection.isConnected)
+            VStack {
+                // Main content area
+                TabView(selection: $selectedView) {
+                    DashboardView(
+                        connection: connection,
+                        controller: controller,
+                        logger: logger
+                    )
+                    .tag(AppView.dashboard)
+                    
+                    DetailsView(
+                        controller: controller,
+                        logger: logger,
+                        connection: connection
+                    )
+                    .tag(AppView.details)
+                    
+                    DatabricksSettingsView(
+                        syncManager: syncManager,
+                        networkMonitor: NetworkMonitor()
+                    )
+                    .tag(AppView.settings)
+                }
+                .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
                 
-                VehicleDataView(vehicleData: controller.vehicleData)
-                
-                ConnectionControlsView(
-                    connection: connection,
-                    logger: logger
-                )
-                
-                Spacer()
-                
-                DebugLogView(logger: logger)
+                // Custom bottom navigation
+                ViewSelectorView(selectedView: $selectedView)
             }
-            .padding()
         }
     }
 }

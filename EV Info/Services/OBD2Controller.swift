@@ -12,17 +12,23 @@ class OBD2Controller: ObservableObject {
     private let connection: BLEConnection
     private let parser: OBD2Parser
     private let logger: Logger
+    private let dataStore: DataStore?
     
     @Published var vehicleData = VehicleData()
     
     // Timers and state
     private var dataTimer: Timer?
+    private var distanceTimer: Timer?
     private var initResponseTimer: Timer?
     private var currentCommandIndex = 0
     private var isWaitingForResponse = false
     private var responseBuffer = ""
     private var initCommandIndex = 0
     private var isInitializing = false
+    private var lastDistanceUpdate = Date()
+    
+    // Data collection
+    private var currentDataPoint = VehicleDataPoint(timestamp: Date())
     
     // Commands
     private let initCommands = ["ATZ", "ATD", "ATE0", "ATS0", "ATAL", "ATSP6"]
@@ -37,10 +43,12 @@ class OBD2Controller: ObservableObject {
         "ATSH7E4",  // Switch header to BMS
         "228334"    // State of charge (BMS ECU)
     ]
-    init(connection: BLEConnection, parser: OBD2Parser, logger: Logger) {
+    
+    init(connection: BLEConnection, parser: OBD2Parser, logger: Logger, dataStore: DataStore? = nil) {
         self.connection = connection
         self.parser = parser
         self.logger = logger
+        self.dataStore = dataStore
         
         setupConnectionCallbacks()
     }
@@ -103,11 +111,18 @@ class OBD2Controller: ObservableObject {
         logger.log(.info, "Starting periodic data fetching")
         
         dataTimer?.invalidate()
+        distanceTimer?.invalidate()
         currentCommandIndex = 0
         isWaitingForResponse = false
+        lastDistanceUpdate = Date()
         
         dataTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
+        }
+        
+        // Start distance tracking timer (updates every 0.1 seconds for accuracy)
+        distanceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
+            self?.updateDistance()
         }
     }
     
@@ -173,6 +188,7 @@ class OBD2Controller: ObservableObject {
         if let result = parser.parseResponse(text) {
             DispatchQueue.main.async {
                 self.updateVehicleData(with: result)
+                self.updateDataPoint(with: result)
             }
         }
     }
@@ -182,8 +198,8 @@ class OBD2Controller: ObservableObject {
         case .speed(let speed):
             vehicleData.speed = speed
             vehicleData.updateEfficiency()
-        case .distance(let distance):
-            vehicleData.updateEfficiency()
+        case .longdistance(let longdistance):
+            vehicleData.longdistance = longdistance
         case .batteryCurrent(let current):
             vehicleData.batteryCurrent = current
             vehicleData.updatePowerAndEfficiency()
@@ -195,12 +211,71 @@ class OBD2Controller: ObservableObject {
         }
     }
     
+    private func updateDataPoint(with result: OBD2ParseResult) {
+        // Update the current data point with each parsed result
+        switch result {
+        case .speed(let speed):
+            currentDataPoint.speedKmh = Int(speed * 1.60934) // Convert mph to km/h
+        case .batteryCurrent(let current):
+            currentDataPoint.currentAmps = current
+        case .voltage(let voltage):
+            currentDataPoint.voltageVolts = voltage
+        case .stateOfCharge(let soc):
+            currentDataPoint.soc = soc
+        default:
+            break
+        }
+        
+        // Save data point periodically (every 10 seconds)
+        if Int(Date().timeIntervalSince(currentDataPoint.timestamp)) >= 10 {
+            saveCurrentDataPoint()
+        }
+    }
+    
+    private func saveCurrentDataPoint() {
+        guard let dataStore = dataStore else { return }
+        
+        // Create a new data point with current timestamp
+        var dataPointToSave = currentDataPoint
+        
+        // Only save if we have at least some data
+        if dataPointToSave.speedKmh != nil ||
+           dataPointToSave.currentAmps != nil ||
+           dataPointToSave.voltageVolts != nil ||
+           dataPointToSave.soc != nil {
+            dataStore.saveDataPoint(dataPointToSave)
+            logger.log(.verbose, "Saved data point to local storage")
+        }
+        
+        // Reset for next interval
+        currentDataPoint = VehicleDataPoint(timestamp: Date())
+    }
+    
+    private func updateDistance() {
+        let now = Date()
+        let timeInterval = now.timeIntervalSince(lastDistanceUpdate)
+        vehicleData.updateDistance(timeInterval: timeInterval)
+        lastDistanceUpdate = now
+    }
+    
+    func resetDistance() {
+        DispatchQueue.main.async {
+            self.vehicleData.distance = 0.0
+            self.lastDistanceUpdate = Date()
+        }
+        logger.log(.info, "Distance reset to zero")
+    }
+    
     private func stopAllTimers() {
         [dataTimer, initResponseTimer].forEach { $0?.invalidate() }
         dataTimer = nil
+        distanceTimer = nil
         initResponseTimer = nil
         isWaitingForResponse = false
         isInitializing = false
+        
+        // Save any pending data
+        saveCurrentDataPoint()
     }
     
     deinit {
