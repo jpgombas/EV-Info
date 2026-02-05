@@ -8,7 +8,7 @@
 import SwiftUI
 
 enum AppView: String, CaseIterable {
-    case dashboard = "Dashboard"
+    case dashboard = "Dash"
     case details = "Details"
     case settings = "Settings"
 }

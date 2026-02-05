@@ -243,21 +243,29 @@ struct DatabricksSettingsView: View {
     
     private func saveConfiguration() {
         UserDefaults.standard.set(workspaceURL, forKey: "databricksWorkspaceURL")
-        keychain.saveToken(accessToken, for: "databricksAccessToken")
+        let tokenSaved = keychain.saveToken(accessToken, for: "databricksAccessToken")
         UserDefaults.standard.set(volumePath, forKey: "databricksVolumePath")
         UserDefaults.standard.set(sqlWarehouseID, forKey: "databricksSQLWarehouseID")
         UserDefaults.standard.set(tableName, forKey: "databricksTableName")
         
-        // Update SyncManager with new configuration
-        syncManager.updateDatabricksConfig(
-            workspaceURL: workspaceURL,
-            accessToken: accessToken,
-            volumePath: volumePath,
-            sqlWarehouseID: sqlWarehouseID,
-            tableName: tableName
-        )
-        
-        showingSuccess = true
+        // Update SyncManager with new configuration only if token was saved successfully
+        if tokenSaved {
+            syncManager.updateDatabricksConfig(
+                workspaceURL: workspaceURL,
+                accessToken: accessToken,
+                volumePath: volumePath,
+                sqlWarehouseID: sqlWarehouseID,
+                tableName: tableName
+            )
+            showingSuccess = true
+        } else {
+            // Surface an error state; do not show success alert
+            #if DEBUG
+            print("DatabricksSettingsView.saveConfiguration: Failed to save access token to keychain.")
+            #endif
+            // Optionally set last error for visibility in the UI if available
+            syncManager.lastSyncError = "Failed to save access token to keychain."
+        }
     }
     
     private func testConnection() {
