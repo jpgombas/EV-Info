@@ -31,19 +31,19 @@ class SyncManager: ObservableObject {
         }
     }
     
-    var syncOnlyOnWiFi: Bool {
+    @Published var syncOnlyOnWiFi: Bool {
         didSet {
             UserDefaults.standard.set(syncOnlyOnWiFi, forKey: "syncOnlyOnWiFi")
         }
     }
     
-    var batchSize: Int {
+    @Published var batchSize: Int {
         didSet {
             UserDefaults.standard.set(batchSize, forKey: "syncBatchSize")
         }
     }
     
-    var uploadMethod: UploadMethod {
+    @Published var uploadMethod: UploadMethod {
         didSet {
             UserDefaults.standard.set(uploadMethod.rawValue, forKey: "uploadMethod")
         }
