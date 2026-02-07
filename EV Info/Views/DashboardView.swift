@@ -31,5 +31,13 @@ struct DashboardView: View {
         .padding()
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear {
+            // Prevent screen from sleeping while on dashboard
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+        .onDisappear {
+            // Re-enable screen sleep when leaving dashboard
+            UIApplication.shared.isIdleTimerDisabled = false
+        }
     }
 }
