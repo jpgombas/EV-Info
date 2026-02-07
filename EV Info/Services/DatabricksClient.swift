@@ -207,20 +207,14 @@ class DatabricksClient {
         let values = data.map { dataPoint -> String in
             let timestamp = "'\(formatter.string(from: dataPoint.timestamp))'"
             let soc = dataPoint.soc?.description ?? "NULL"
-            let capacity = dataPoint.batteryCapacityKWh?.description ?? "NULL"
-            let tempC = dataPoint.batteryTempCelsius?.description ?? "NULL"
-            let tempF = dataPoint.batteryTempFahrenheit?.description ?? "NULL"
             let charging = dataPoint.isCharging?.description.uppercased() ?? "NULL"
             let speed = dataPoint.speedKmh?.description ?? "NULL"
             let current = dataPoint.currentAmps?.description ?? "NULL"
             let voltage = dataPoint.voltageVolts?.description ?? "NULL"
-            let acPower = dataPoint.cabinACPowerWatts?.description ?? "NULL"
-            let heatPower = dataPoint.cabinHeatPowerWatts?.description ?? "NULL"
-            let transmission = dataPoint.transmissionPosition?.description ?? "NULL"
             let distance = dataPoint.distanceMi?.description ?? "NULL"
             let ambient = dataPoint.ambientTempF?.description ?? "NULL"
             
-            return "(\(timestamp), \(soc), \(capacity), \(tempC), \(tempF), \(charging), \(speed), \(current), \(voltage), \(acPower), \(heatPower), \(transmission), \(distance), \(ambient))"
+            return "(\(timestamp), \(soc), \(charging), \(speed), \(current), \(voltage), \(distance), \(ambient))"
         }.joined(separator: ",\n")
         
         return """

@@ -27,6 +27,15 @@ class OBD2Controller: ObservableObject {
     private var isInitializing = false
     private var lastDistanceUpdate = Date()
     
+    @Published var dataTimerDuration = 1.0 {
+        didSet {
+            // Restart the data timer with the new duration if it's currently running
+            if dataTimer != nil {
+                restartDataTimer()
+            }
+        }
+    }
+    
     // Data collection
     private var currentDataPoint = VehicleDataPoint(timestamp: Date())
     
@@ -116,13 +125,24 @@ class OBD2Controller: ObservableObject {
         isWaitingForResponse = false
         lastDistanceUpdate = Date()
         
-        dataTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] timer in
+        dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
         }
         
         // Start distance tracking timer (updates every 0.1 seconds for accuracy)
         distanceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
             self?.updateDistance()
+        }
+    }
+    
+    private func restartDataTimer() {
+        guard connection.isConnected, dataTimer != nil else { return }
+        
+        logger.log(.info, "Restarting data timer with new duration: \(dataTimerDuration)s")
+        dataTimer?.invalidate()
+        
+        dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
+            self?.sendNextDataCommand()
         }
     }
     
@@ -208,8 +228,7 @@ class OBD2Controller: ObservableObject {
             vehicleData.updatePowerAndEfficiency()
         case .stateOfCharge(let soc):
             vehicleData.stateOfCharge = soc
-        case .ambientTemperature(let celsius):
-            let fahrenheit = (celsius * 9.0 / 5.0) + 32.0
+        case .ambientTemperature(let fahrenheit):
             vehicleData.ambientTempF = fahrenheit
         }
     }
@@ -233,8 +252,9 @@ class OBD2Controller: ObservableObject {
             break
         }
         
-        // Save data point periodically (every 10 seconds)
-        if Int(Date().timeIntervalSince(currentDataPoint.timestamp)) >= 10 {
+        // Save data point periodically (based on timer duration and command count)
+        let saveInterval = dataTimerDuration * Double(fetchCommands.count) * 1.2
+        if Date().timeIntervalSince(currentDataPoint.timestamp) >= saveInterval {
             saveCurrentDataPoint()
         }
     }
@@ -289,4 +309,3 @@ class OBD2Controller: ObservableObject {
         stopAllTimers()
     }
 }
-

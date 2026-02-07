@@ -26,10 +26,9 @@ struct VehicleDataView: View {
                 DataCard(title: "Battery Level", value: String(format: "%.1f", vehicleData.stateOfCharge), unit: "%")
                 DataCard(title: "Efficiency", value: String(format: "%.1f", vehicleData.efficiency), unit: "mi/kWh")
             }
-            let range = (vehicleData.stateOfCharge * 65.0) * vehicleData.efficiency
             HStack(spacing: 30) {
                 DataCard(title: "Distance", value: String(format: "%.1f", vehicleData.distance), unit: "mi")
-                DataCard(title: "Range", value: String(format: "%.1f", range), unit: "mi")
+                DataCard(title: "Temperature", value: String(format: "%.1f", vehicleData.ambientTempF), unit: "F")
             }
         }
     }

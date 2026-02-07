@@ -3,6 +3,7 @@ import SwiftUI
 struct DatabricksSettingsView: View {
     @ObservedObject var syncManager: SyncManager
     @ObservedObject var networkMonitor: NetworkMonitor
+    @ObservedObject var obd2Controller: OBD2Controller
     
     @State private var workspaceURL = "https://dbc-44b8c99f-a387.cloud.databricks.com"
     @State private var accessToken = "REDACTED_DATABRICKS_API_TOKEN"
@@ -62,6 +63,17 @@ struct DatabricksSettingsView: View {
                         .help("Only sync when connected to WiFi")
                     
                     Stepper("Batch Size: \(syncManager.batchSize)", value: $syncManager.batchSize, in: 10...1000, step: 10)
+                }
+                
+                Section(header: Text("OBD2 Settings")) {
+                    Stepper(value: $obd2Controller.dataTimerDuration, in: 0.5...2.0, step: 0.1) {
+                        HStack {
+                            Text("OBD Data Timer")
+                            Spacer()
+                            Text(String(format: "%.1f sec", obd2Controller.dataTimerDuration))
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 }
                 
                 Section(header: Text("Status")) {
@@ -311,6 +323,15 @@ struct DatabricksSettingsView: View {
     )
     let client = DatabricksClient(config: config)
     let syncManager = SyncManager(databricksClient: client, dataStore: dataStore)
+
+    let logger = Logger()
+    let parser = OBD2Parser(logger: logger)
+    let connection = BLEConnection(logger: logger)
+    let obd2Controller = OBD2Controller(connection: connection, parser: parser, logger: logger, dataStore: dataStore)
     
-    return DatabricksSettingsView(syncManager: syncManager, networkMonitor: NetworkMonitor())
+    DatabricksSettingsView(
+        syncManager: syncManager,
+        networkMonitor: NetworkMonitor(),
+        obd2Controller: obd2Controller
+    )
 }

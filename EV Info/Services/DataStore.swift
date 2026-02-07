@@ -36,16 +36,10 @@ class DataStore: ObservableObject {
         entity.id = dataPoint.id
         entity.timestamp = dataPoint.timestamp
         entity.soc = dataPoint.soc ?? 0
-        entity.batteryCapacityKWh = dataPoint.batteryCapacityKWh ?? 0
-        entity.batteryTempCelsius = dataPoint.batteryTempCelsius ?? 0
-        entity.batteryTempFahrenheit = dataPoint.batteryTempFahrenheit ?? 0
         entity.isCharging = dataPoint.isCharging ?? false
         entity.speedKmh = Int16(dataPoint.speedKmh ?? 0)
         entity.currentAmps = dataPoint.currentAmps ?? 0
         entity.voltageVolts = dataPoint.voltageVolts ?? 0
-        entity.cabinACPowerWatts = dataPoint.cabinACPowerWatts ?? 0
-        entity.cabinHeatPowerWatts = dataPoint.cabinHeatPowerWatts ?? 0
-        entity.transmissionPosition = Int16(dataPoint.transmissionPosition ?? 0)
         entity.ambientTempF = dataPoint.ambientTempF ?? 0
         
         if let distanceMiles = dataPoint.distanceMi {
@@ -214,16 +208,10 @@ extension VehicleDataEntity {
         let dataPointID = id ?? UUID()
         var dataPoint = VehicleDataPoint(id: dataPointID, timestamp: timestamp ?? Date())
         dataPoint.soc = soc
-        dataPoint.batteryCapacityKWh = batteryCapacityKWh
-        dataPoint.batteryTempCelsius = batteryTempCelsius
-        dataPoint.batteryTempFahrenheit = batteryTempFahrenheit
         dataPoint.isCharging = isCharging
         dataPoint.speedKmh = Int(speedKmh)
         dataPoint.currentAmps = currentAmps
         dataPoint.voltageVolts = voltageVolts
-        dataPoint.cabinACPowerWatts = cabinACPowerWatts
-        dataPoint.cabinHeatPowerWatts = cabinHeatPowerWatts
-        dataPoint.transmissionPosition = Int(transmissionPosition)
         dataPoint.ambientTempF = ambientTempF
         dataPoint.distanceMi = distanceKm * 0.621371
         dataPoint.syncedToDatabricks = syncedToDatabricks
