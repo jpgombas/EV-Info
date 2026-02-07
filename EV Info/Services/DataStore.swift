@@ -46,6 +46,11 @@ class DataStore: ObservableObject {
         entity.cabinACPowerWatts = dataPoint.cabinACPowerWatts ?? 0
         entity.cabinHeatPowerWatts = dataPoint.cabinHeatPowerWatts ?? 0
         entity.transmissionPosition = Int16(dataPoint.transmissionPosition ?? 0)
+        entity.ambientTempF = dataPoint.ambientTempF ?? 0
+        
+        if let distanceMiles = dataPoint.distanceMi {
+            entity.distanceKm = distanceMiles * 1.60934
+        }
         entity.syncedToDatabricks = false
         
         saveContext()
@@ -219,6 +224,8 @@ extension VehicleDataEntity {
         dataPoint.cabinACPowerWatts = cabinACPowerWatts
         dataPoint.cabinHeatPowerWatts = cabinHeatPowerWatts
         dataPoint.transmissionPosition = Int(transmissionPosition)
+        dataPoint.ambientTempF = ambientTempF
+        dataPoint.distanceMi = distanceKm * 0.621371
         dataPoint.syncedToDatabricks = syncedToDatabricks
         
         return dataPoint

@@ -14,6 +14,8 @@ class OBD2Parser {
             return parseVehicleSpeed(cleanText)
         } else if cleanText.contains("4131") {
             return parseVehicleDistance(cleanText)
+        } else if cleanText.contains("0046") {
+            return parseAmbientTemperature(cleanText)
         } else if cleanText.contains("622414") {
             return parseBatteryCurrent(cleanText)
         } else if cleanText.contains("622885") {
@@ -31,7 +33,25 @@ class OBD2Parser {
                   .replacingOccurrences(of: "\r", with: "")
                   .replacingOccurrences(of: "\n", with: "")
     }
-    // MARK: - Vehicle Spped
+    // MARK: - Ambient Temperature
+    private func parseAmbientTemperature(_ cleanText: String) -> OBD2ParseResult? {
+        // Expect pattern containing "0046" followed by at least 1 byte for A
+        guard let range = cleanText.range(of: "0046"),
+              String(cleanText[range.upperBound...]).count >= 2 else { return nil }
+        
+        let aHex = String(cleanText[range.upperBound...].prefix(2))
+        guard let A = Int(aHex, radix: 16) else { return nil }
+        
+        // PID 0x46: Ambient air temperature
+        // Celsius = A - 40
+        let celsius = Double(A) - 40.0
+        // Fahrenheit per provided formula
+        let fahrenheit = (celsius * 9.0 / 5.0) + 32.0
+        
+        logger.log(.data, String(format: "Ambient: %.1f °F", fahrenheit))
+        return .ambientTemperature(fahrenheit)
+    }
+    // MARK: - Vehicle Speed
     private func parseVehicleSpeed(_ cleanText: String) -> OBD2ParseResult? {
         guard let range = cleanText.range(of: "410D"),
               String(cleanText[range.upperBound...]).count >= 2 else { return nil }
@@ -147,4 +167,6 @@ enum OBD2ParseResult {
     case batteryCurrent(Double)
     case voltage(Double)
     case stateOfCharge(Double)
+    case ambientTemperature(Double)
 }
+

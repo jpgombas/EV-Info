@@ -169,35 +169,6 @@ struct DatabricksSettingsView: View {
                     .disabled(syncManager.isSyncing || syncManager.pendingRecordCount == 0)
                 }
                 
-                Section(header: Text("Debug Info")) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("UI State Values:")
-                            .fontWeight(.semibold)
-                        Text("URL: \(workspaceURL.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                        Text("Token: \(accessToken.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                        Text("Volume: \(volumePath.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                        
-                        Divider()
-                        
-                        Text("UserDefaults Values:")
-                            .fontWeight(.semibold)
-                        let savedURL = UserDefaults.standard.string(forKey: "databricksWorkspaceURL") ?? "NOT SET"
-                        let savedToken = (DatabricksKeychain().loadToken(for: "databricksAccessToken") ?? "NOT SET")
-                        let savedVolume = UserDefaults.standard.string(forKey: "databricksVolumePath") ?? "NOT SET"
-                        
-                        Text("URL: \(savedURL.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                        Text("Token: \(savedToken.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                        Text("Volume: \(savedVolume.isEmpty ? "EMPTY" : "SET")")
-                            .font(.caption)
-                    }
-                    .padding(.vertical, 8)
-                }
-                
                 Section {
                     Button(action: { saveConfiguration() }) {
                         Text("Save Configuration")

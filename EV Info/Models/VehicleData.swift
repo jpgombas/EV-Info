@@ -1,6 +1,7 @@
 import Foundation
 
 struct VehicleData {
+    var ambientTempF: Double = 0.0
     var speed: Double = 0
     var batteryCurrent: Double = 0.0
     var voltage: Double = 0.0
@@ -30,3 +31,4 @@ struct VehicleData {
         distance += milesPerSecond * timeInterval
     }
 }
+

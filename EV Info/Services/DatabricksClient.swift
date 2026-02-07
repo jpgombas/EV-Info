@@ -217,15 +217,17 @@ class DatabricksClient {
             let acPower = dataPoint.cabinACPowerWatts?.description ?? "NULL"
             let heatPower = dataPoint.cabinHeatPowerWatts?.description ?? "NULL"
             let transmission = dataPoint.transmissionPosition?.description ?? "NULL"
+            let distance = dataPoint.distanceMi?.description ?? "NULL"
+            let ambient = dataPoint.ambientTempF?.description ?? "NULL"
             
-            return "(\(timestamp), \(soc), \(capacity), \(tempC), \(tempF), \(charging), \(speed), \(current), \(voltage), \(acPower), \(heatPower), \(transmission))"
+            return "(\(timestamp), \(soc), \(capacity), \(tempC), \(tempF), \(charging), \(speed), \(current), \(voltage), \(acPower), \(heatPower), \(transmission), \(distance), \(ambient))"
         }.joined(separator: ",\n")
         
         return """
         INSERT INTO \(tableName)
         (timestamp, soc, battery_capacity_kwh, battery_temp_celsius, battery_temp_fahrenheit,
          is_charging, speed_kmh, current_amps, voltage_volts, cabin_ac_power_watts,
-         cabin_heat_power_watts, transmission_position)
+         cabin_heat_power_watts, transmission_position, distance_mi, ambient_temp_f)
         VALUES
         \(values)
         """

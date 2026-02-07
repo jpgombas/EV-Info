@@ -208,6 +208,9 @@ class OBD2Controller: ObservableObject {
             vehicleData.updatePowerAndEfficiency()
         case .stateOfCharge(let soc):
             vehicleData.stateOfCharge = soc
+        case .ambientTemperature(let celsius):
+            let fahrenheit = (celsius * 9.0 / 5.0) + 32.0
+            vehicleData.ambientTempF = fahrenheit
         }
     }
     
@@ -222,6 +225,10 @@ class OBD2Controller: ObservableObject {
             currentDataPoint.voltageVolts = voltage
         case .stateOfCharge(let soc):
             currentDataPoint.soc = soc
+        case .longdistance(let longdistance):
+            currentDataPoint.distanceMi = longdistance
+        case .ambientTemperature(let fahrenheit):
+            currentDataPoint.ambientTempF = fahrenheit
         default:
             break
         }
@@ -236,7 +243,7 @@ class OBD2Controller: ObservableObject {
         guard let dataStore = dataStore else { return }
         
         // Create a new data point with current timestamp
-        var dataPointToSave = currentDataPoint
+        let dataPointToSave = currentDataPoint
         
         // Only save if we have at least some data
         if dataPointToSave.speedKmh != nil ||
@@ -282,3 +289,4 @@ class OBD2Controller: ObservableObject {
         stopAllTimers()
     }
 }
+
