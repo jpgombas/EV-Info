@@ -8,7 +8,6 @@ struct VehicleDataPoint: Codable, Identifiable {
     
     // Vehicle telemetry
     var soc: Double? // State of charge (%)
-    var isCharging: Bool?
     var speedKmh: Int?
     var currentAmps: Double?
     var voltageVolts: Double?
@@ -22,7 +21,6 @@ struct VehicleDataPoint: Codable, Identifiable {
         case id
         case timestamp
         case soc
-        case isCharging
         case speedKmh
         case currentAmps
         case voltageVolts
@@ -36,7 +34,6 @@ struct VehicleDataPoint: Codable, Identifiable {
         self.id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         self.timestamp = try container.decodeIfPresent(Date.self, forKey: .timestamp) ?? Date()
         self.soc = try container.decodeIfPresent(Double.self, forKey: .soc)
-        self.isCharging = try container.decodeIfPresent(Bool.self, forKey: .isCharging)
         self.speedKmh = try container.decodeIfPresent(Int.self, forKey: .speedKmh)
         self.currentAmps = try container.decodeIfPresent(Double.self, forKey: .currentAmps)
         self.voltageVolts = try container.decodeIfPresent(Double.self, forKey: .voltageVolts)
@@ -50,7 +47,6 @@ struct VehicleDataPoint: Codable, Identifiable {
         try container.encode(id, forKey: .id)
         try container.encode(timestamp, forKey: .timestamp)
         try container.encodeIfPresent(soc, forKey: .soc)
-        try container.encodeIfPresent(isCharging, forKey: .isCharging)
         try container.encodeIfPresent(speedKmh, forKey: .speedKmh)
         try container.encodeIfPresent(currentAmps, forKey: .currentAmps)
         try container.encodeIfPresent(voltageVolts, forKey: .voltageVolts)
@@ -84,18 +80,17 @@ struct VehicleDataPoint: Codable, Identifiable {
         let formatter = ISO8601DateFormatter()
         let timestamp = formatter.string(from: self.timestamp)
         let soc = self.soc?.description ?? ""
-        let charging = isCharging?.description ?? ""
         let speed = speedKmh?.description ?? ""
         let current = currentAmps?.description ?? ""
         let voltage = voltageVolts?.description ?? ""
         let distance = distanceMi?.description ?? ""
         let ambient = ambientTempF?.description ?? ""
         
-        return [timestamp, soc, charging, speed, current, voltage, distance, ambient].joined(separator: ",")
+        return [timestamp, soc, speed, current, voltage, distance, ambient].joined(separator: ",")
     }
     
     static var csvHeader: String {
-        return "timestamp,soc,is_charging,speed_kmh,current_amps,voltage_volts,distance_mi,ambient_temp_f"
+        return "timestamp,soc,speed_kmh,current_amps,voltage_volts,distance_mi,ambient_temp_f"
     }
 }
 

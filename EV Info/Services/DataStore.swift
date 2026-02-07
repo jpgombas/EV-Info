@@ -36,7 +36,6 @@ class DataStore: ObservableObject {
         entity.id = dataPoint.id
         entity.timestamp = dataPoint.timestamp
         entity.soc = dataPoint.soc ?? 0
-        entity.isCharging = dataPoint.isCharging ?? false
         entity.speedKmh = Int16(dataPoint.speedKmh ?? 0)
         entity.currentAmps = dataPoint.currentAmps ?? 0
         entity.voltageVolts = dataPoint.voltageVolts ?? 0
@@ -208,7 +207,6 @@ extension VehicleDataEntity {
         let dataPointID = id ?? UUID()
         var dataPoint = VehicleDataPoint(id: dataPointID, timestamp: timestamp ?? Date())
         dataPoint.soc = soc
-        dataPoint.isCharging = isCharging
         dataPoint.speedKmh = Int(speedKmh)
         dataPoint.currentAmps = currentAmps
         dataPoint.voltageVolts = voltageVolts

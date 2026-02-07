@@ -207,21 +207,18 @@ class DatabricksClient {
         let values = data.map { dataPoint -> String in
             let timestamp = "'\(formatter.string(from: dataPoint.timestamp))'"
             let soc = dataPoint.soc?.description ?? "NULL"
-            let charging = dataPoint.isCharging?.description.uppercased() ?? "NULL"
             let speed = dataPoint.speedKmh?.description ?? "NULL"
             let current = dataPoint.currentAmps?.description ?? "NULL"
             let voltage = dataPoint.voltageVolts?.description ?? "NULL"
             let distance = dataPoint.distanceMi?.description ?? "NULL"
             let ambient = dataPoint.ambientTempF?.description ?? "NULL"
             
-            return "(\(timestamp), \(soc), \(charging), \(speed), \(current), \(voltage), \(distance), \(ambient))"
+            return "(\(timestamp), \(soc), \(speed), \(current), \(voltage), \(distance), \(ambient))"
         }.joined(separator: ",\n")
         
         return """
         INSERT INTO \(tableName)
-        (timestamp, soc, battery_capacity_kwh, battery_temp_celsius, battery_temp_fahrenheit,
-         is_charging, speed_kmh, current_amps, voltage_volts, cabin_ac_power_watts,
-         cabin_heat_power_watts, transmission_position, distance_mi, ambient_temp_f)
+        (timestamp, soc, speed_kmh, current_amps, voltage_volts, distance_mi, ambient_temp_f)
         VALUES
         \(values)
         """
