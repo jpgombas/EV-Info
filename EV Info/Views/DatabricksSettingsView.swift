@@ -36,25 +36,19 @@ struct DatabricksSettingsView: View {
                         Text("JSON File").tag(SyncManager.UploadMethod.json)
                         Text("SQL Warehouse").tag(SyncManager.UploadMethod.sqlWarehouse)
                     }
-                }
-                
-                if syncManager.uploadMethod == .csv || syncManager.uploadMethod == .json {
-                    Section(header: Text("Volume Configuration")) {
+                    if syncManager.uploadMethod == .csv || syncManager.uploadMethod == .json {
                         TextField("Volume Path", text: $volumePath)
                             .autocorrectionDisabled()
                             .textContentType(.URL)
                     }
-                }
-                
-                if syncManager.uploadMethod == .sqlWarehouse {
-                    Section(header: Text("SQL Warehouse Configuration")) {
+                    if syncManager.uploadMethod == .sqlWarehouse {
                         TextField("Warehouse ID", text: $sqlWarehouseID)
                             .autocorrectionDisabled()
                         
                         TextField("Table Name", text: $tableName)
                             .autocorrectionDisabled()
                     }
-                }
+                } 
                 
                 Section(header: Text("Sync Settings")) {
                     Toggle("Auto Sync Enabled", isOn: $syncManager.autoSyncEnabled)
@@ -189,7 +183,7 @@ struct DatabricksSettingsView: View {
                     .disabled(workspaceURL.isEmpty || accessToken.isEmpty)
                 }
             }
-            .navigationTitle("Databricks Settings")
+            .navigationTitle("Settings")
             .onAppear {
                 loadConfiguration()
                 syncManager.updatePendingCount()
