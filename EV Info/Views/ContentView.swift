@@ -44,7 +44,8 @@ struct ContentView: View {
                     DashboardView(
                         connection: connection,
                         controller: controller,
-                        logger: logger
+                        logger: logger,
+                        syncManager: syncManager 
                     )
                     .tag(AppView.dashboard)
                     

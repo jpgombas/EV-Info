@@ -16,8 +16,9 @@ class SyncManager: ObservableObject {
     private var databricksClient: DatabricksClient
     private let dataStore: DataStore
     private var syncTimer: Timer?
-    private let autoSyncInterval: TimeInterval = 300 // 5 minutes
+    private let autoSyncInterval: TimeInterval = 300 // 5 minute
     private let networkMonitor = NetworkMonitor()
+    private var cancellables = Set<AnyCancellable>()
     
     // Settings
     var autoSyncEnabled: Bool {
@@ -82,6 +83,9 @@ class SyncManager: ObservableObject {
             self.lastSyncTime = timestamp
         }
         
+        // Load total synced records count
+        self.totalSyncedRecords = UserDefaults.standard.integer(forKey: "totalSyncedRecords")
+        
         // Start auto sync if enabled
         if autoSyncEnabled {
             startAutoSync()
@@ -89,6 +93,19 @@ class SyncManager: ObservableObject {
         
         // Update pending count
         updatePendingCount()
+        
+        // Observe DataStore changes to auto-update pending count
+        setupDataStoreObserver()
+    }
+    
+    // MARK: - DataStore Observer
+    
+    private func setupDataStoreObserver() {
+        dataStore.objectWillChange
+            .sink { [weak self] _ in
+                self?.updatePendingCount()
+            }
+            .store(in: &cancellables)
     }
     
     // MARK: - Public Methods
@@ -116,8 +133,20 @@ class SyncManager: ObservableObject {
     }
     
     /// Update the count of pending records
-    func updatePendingCount() {
-        pendingRecordCount = dataStore.getUnsyncedRecordCount()
+    @discardableResult
+    func updatePendingCount() -> Int {
+        let newCount = dataStore.getUnsyncedRecordCount()
+        
+        // Update immediately if on main thread, otherwise dispatch
+        if Thread.isMainThread {
+            pendingRecordCount = newCount
+        } else {
+            DispatchQueue.main.async { [weak self] in
+                self?.pendingRecordCount = newCount
+            }
+        }
+        
+        return newCount
     }
     
     /// Update Databricks client configuration (call this when settings are saved)
@@ -145,8 +174,8 @@ class SyncManager: ObservableObject {
         }
         
         // Check if there's data to sync
-        updatePendingCount()
-        guard pendingRecordCount > 0 else {
+        let currentPendingCount = updatePendingCount()
+        guard currentPendingCount > 0 else {
             print("No pending records to sync")
             return
         }
@@ -175,16 +204,20 @@ class SyncManager: ObservableObject {
                 // Mark records as synced
                 dataStore.markRecordsAsSynced(unsyncedRecords.map { $0.id })
                 
+                // Update total synced count
+                let newTotal = totalSyncedRecords + unsyncedRecords.count
                 await MainActor.run {
-                    totalSyncedRecords += unsyncedRecords.count
-                    print("Successfully synced \(unsyncedRecords.count) records")
+                    totalSyncedRecords = newTotal
+                    // Persist the total count
+                    UserDefaults.standard.set(newTotal, forKey: "totalSyncedRecords")
+                    print("Successfully synced \(unsyncedRecords.count) records (total: \(newTotal))")
                 }
                 
                 await finishSync(success: true, error: nil)
                 
                 // If there are more records, sync again
-                updatePendingCount()
-                if pendingRecordCount > 0 {
+                let remainingRecords = updatePendingCount()
+                if remainingRecords > 0 {
                     // Small delay before next batch
                     try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
                     await performSync()
@@ -224,6 +257,7 @@ class SyncManager: ObservableObject {
                 lastSyncError = error
             }
             
+            // Force update pending count after sync completes
             updatePendingCount()
         }
     }
