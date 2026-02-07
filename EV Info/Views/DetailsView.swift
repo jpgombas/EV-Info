@@ -13,22 +13,46 @@ struct DetailsView: View {
     @ObservedObject var connection: BLEConnection
 
     var body: some View {
-        VStack(spacing: 20) {
-            // Power and Distance Cards
-            HStack(spacing: 20) {
-                PowerCard(vehicleData: controller.vehicleData)
-                DistanceCard(
-                    vehicleData: controller.vehicleData,
-                    onReset: { controller.resetDistance() }
-                )
+        VStack(spacing: 0) {
+            // Header controls
+            VStack(spacing: 10) {
+                HStack {
+                    Text("Debug Log")
+                        .font(.headline)
+                    Spacer()
+                    
+                    Picker("Log Level", selection: $logger.logLevel) {
+                        ForEach(LogLevel.allCases, id: \.self) { level in
+                            Text(level.rawValue).tag(level)
+                        }
+                    }
+                    .pickerStyle(MenuPickerStyle())
+                    .font(.caption)
+                }
+                
+                Button("Check Status") {
+                    connection.checkBluetoothStatus()
+                }
+                .buttonStyle(.bordered)
+                .font(.caption)
             }
+            .padding()
+            .background(Color.gray.opacity(0.1))
             
-            Spacer()
-            
-            // Debug Log takes up remaining space
-            DebugLogView(logger: logger, connection: connection)
+            // Full-screen scrollable log
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(logger.messages.reversed(), id: \.id) { message in
+                        Text(message.formattedMessage)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                .padding()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(Color.gray.opacity(0.05))
         }
-        .padding()
         .navigationTitle("Details")
         .navigationBarTitleDisplayMode(.inline)
     }

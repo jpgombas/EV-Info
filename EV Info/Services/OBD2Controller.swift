@@ -26,6 +26,7 @@ class OBD2Controller: ObservableObject {
     private var initCommandIndex = 0
     private var isInitializing = false
     private var lastDistanceUpdate = Date()
+    private var initialLongDistance: Double?  // Track starting distance for relative calculation
     
     @Published var dataTimerDuration = 1.0 {
         didSet {
@@ -120,18 +121,11 @@ class OBD2Controller: ObservableObject {
         logger.log(.info, "Starting periodic data fetching")
         
         dataTimer?.invalidate()
-        distanceTimer?.invalidate()
         currentCommandIndex = 0
         isWaitingForResponse = false
-        lastDistanceUpdate = Date()
         
         dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
-        }
-        
-        // Start distance tracking timer (updates every 0.1 seconds for accuracy)
-        distanceTimer = Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
-            self?.updateDistance()
         }
     }
     
@@ -220,6 +214,15 @@ class OBD2Controller: ObservableObject {
             vehicleData.updateEfficiency()
         case .longdistance(let longdistance):
             vehicleData.longdistance = longdistance
+            
+            // Set initial distance on first reading
+            if initialLongDistance == nil {
+                initialLongDistance = longdistance
+                vehicleData.relativeDistance = 0.0
+            } else {
+                // Calculate relative distance from initial reading
+                vehicleData.relativeDistance = longdistance - (initialLongDistance ?? 0)
+            }
         case .batteryCurrent(let current):
             vehicleData.batteryCurrent = current
             vehicleData.updatePowerAndEfficiency()
@@ -278,17 +281,11 @@ class OBD2Controller: ObservableObject {
         currentDataPoint = VehicleDataPoint(timestamp: Date())
     }
     
-    private func updateDistance() {
-        let now = Date()
-        let timeInterval = now.timeIntervalSince(lastDistanceUpdate)
-        vehicleData.updateDistance(timeInterval: timeInterval)
-        lastDistanceUpdate = now
-    }
-    
     func resetDistance() {
         DispatchQueue.main.async {
-            self.vehicleData.distance = 0.0
-            self.lastDistanceUpdate = Date()
+            // Reset the baseline to current longdistance reading
+            self.initialLongDistance = self.vehicleData.longdistance
+            self.vehicleData.relativeDistance = 0.0
         }
         logger.log(.info, "Distance reset to zero")
     }
@@ -296,7 +293,6 @@ class OBD2Controller: ObservableObject {
     private func stopAllTimers() {
         [dataTimer, initResponseTimer].forEach { $0?.invalidate() }
         dataTimer = nil
-        distanceTimer = nil
         initResponseTimer = nil
         isWaitingForResponse = false
         isInitializing = false

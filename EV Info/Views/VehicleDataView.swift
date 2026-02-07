@@ -27,7 +27,7 @@ struct VehicleDataView: View {
                 DataCard(title: "Efficiency", value: String(format: "%.1f", vehicleData.efficiency), unit: "mi/kWh")
             }
             HStack(spacing: 30) {
-                DataCard(title: "Distance", value: String(format: "%.1f", vehicleData.distance), unit: "mi")
+                DataCard(title: "Distance", value: String(format: "%.1f", vehicleData.relativeDistance), unit: "mi")
                 DataCard(title: "Temperature", value: String(format: "%.1f", vehicleData.ambientTempF), unit: "F")
             }
         }
