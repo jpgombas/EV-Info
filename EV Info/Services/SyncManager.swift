@@ -17,7 +17,7 @@ class SyncManager: ObservableObject {
     private let dataStore: DataStore
     private var syncTimer: Timer?
     private let autoSyncInterval: TimeInterval = 300 // 5 minute
-    private let networkMonitor = NetworkMonitor()
+    let networkMonitor = NetworkMonitor()
     private var cancellables = Set<AnyCancellable>()
     
     // Settings
@@ -177,7 +177,6 @@ class SyncManager: ObservableObject {
 
         // Check WiFi requirement
         if syncOnlyOnWiFi && !networkMonitor.isOnWiFi {
-            print("Skipping sync: WiFi required but not connected")
             await MainActor.run { isSyncing = false }
             return
         }
@@ -185,7 +184,6 @@ class SyncManager: ObservableObject {
         // Check if there's data to sync
         let currentPendingCount = updatePendingCount()
         guard currentPendingCount > 0 else {
-            print("No pending records to sync")
             await MainActor.run { isSyncing = false }
             return
         }
@@ -198,9 +196,6 @@ class SyncManager: ObservableObject {
                 await finishSync(success: true, error: nil)
                 return
             }
-            
-            print("DEBUG: Attempting to sync \(unsyncedRecords.count) records...")
-            print("DEBUG: Upload method: \(uploadMethod)")
             
             // Upload to Databricks using configured method
             let response = try await uploadData(unsyncedRecords)
@@ -215,7 +210,6 @@ class SyncManager: ObservableObject {
                     totalSyncedRecords = newTotal
                     // Persist the total count
                     UserDefaults.standard.set(newTotal, forKey: "totalSyncedRecords")
-                    print("Successfully synced \(unsyncedRecords.count) records (total: \(newTotal))")
                 }
                 
                 await finishSync(success: true, error: nil)
@@ -239,13 +233,10 @@ class SyncManager: ObservableObject {
     private func uploadData(_ data: [VehicleDataPoint]) async throws -> UploadResponse {
         switch uploadMethod {
         case .csv:
-            print("DEBUG: Uploading CSV using databricksClient")
             return try await databricksClient.uploadCSVToVolume(data: data)
         case .json:
-            print("DEBUG: Uploading JSON using databricksClient")
             return try await databricksClient.uploadJSONToVolume(data: data)
         case .sqlWarehouse:
-            print("DEBUG: Uploading via SQL Warehouse using databricksClient")
             return try await databricksClient.uploadViaSQLWarehouse(data: data)
         }
     }
@@ -272,8 +263,6 @@ class SyncManager: ObservableObject {
     /// Retry failed syncs with exponential backoff
     func retryFailedSync(attempt: Int = 1, maxAttempts: Int = 3) async {
         let backoffDelay = TimeInterval(pow(2.0, Double(attempt))) // 2^attempt seconds
-        
-        print("Retry attempt \(attempt) after \(backoffDelay)s delay...")
         
         try? await Task.sleep(nanoseconds: UInt64(backoffDelay * 1_000_000_000))
         

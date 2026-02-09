@@ -59,7 +59,7 @@ struct ContentView: View {
                     
                     DatabricksSettingsView(
                         syncManager: syncManager,
-                        networkMonitor: NetworkMonitor(),
+                        networkMonitor: syncManager.networkMonitor,
                         obd2Controller: controller
                     )
                     .tag(AppView.settings)

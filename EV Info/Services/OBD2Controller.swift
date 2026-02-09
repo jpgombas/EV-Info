@@ -18,14 +18,12 @@ class OBD2Controller: ObservableObject {
     
     // Timers and state
     private var dataTimer: Timer?
-    private var distanceTimer: Timer?
     private var initResponseTimer: Timer?
     private var currentCommandIndex = 0
     private var isWaitingForResponse = false
     private var responseBuffer = ""
     private var initCommandIndex = 0
     private var isInitializing = false
-    private var lastDistanceUpdate = Date()
     private var initialLongDistance: Double?  // Track starting distance for relative calculation
     
     @Published var dataTimerDuration = 0.8 {
@@ -103,16 +101,16 @@ class OBD2Controller: ObservableObject {
     private func continueInitSequence() {
         initResponseTimer?.invalidate()
         initCommandIndex += 1
-        
+
         if initCommandIndex >= initCommands.count {
             isInitializing = false
             logger.log(.success, "Initialization complete - starting data fetch")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                self.startDataFetching()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+                self?.startDataFetching()
             }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.sendNextInitCommand()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+                self?.sendNextInitCommand()
             }
         }
     }
@@ -161,7 +159,8 @@ class OBD2Controller: ObservableObject {
         
         currentCommandIndex = (currentCommandIndex + 1) % fetchCommands.count
         
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+            guard let self = self else { return }
             if self.isWaitingForResponse {
                 self.logger.log(.warning, "Response timeout: \(command)")
                 self.isWaitingForResponse = false
@@ -200,7 +199,8 @@ class OBD2Controller: ObservableObject {
         
         // Parse the response and update vehicle data
         if let result = parser.parseResponse(text) {
-            DispatchQueue.main.async {
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
                 self.updateVehicleData(with: result)
                 self.updateDataPoint(with: result)
             }

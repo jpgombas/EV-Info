@@ -59,13 +59,6 @@ class DataStore: ObservableObject {
         }
     }
     
-    /// Save multiple data points
-    func saveDataPoints(_ dataPoints: [VehicleDataPoint]) {
-        for dataPoint in dataPoints {
-            saveDataPoint(dataPoint)
-        }
-    }
-    
     /// Get all unsynced records (thread-safe — uses background context)
     func getUnsyncedRecords(limit: Int = 100) -> [VehicleDataPoint] {
         var results: [VehicleDataPoint] = []

@@ -181,7 +181,6 @@ struct DatabricksEmbeddedWebView: UIViewRepresentable {
 
         // Load the published dashboard URL directly — user authenticates via Databricks login
         let dashboardURL = URL(string: "\(config.workspaceURL)/dashboardsv3/\(dashboardId)/published?o=\(workspaceId)")!
-        print("Loading published dashboard: \(dashboardURL)")
         webView.load(URLRequest(url: dashboardURL))
     }
     
@@ -208,7 +207,6 @@ struct DatabricksEmbeddedWebView: UIViewRepresentable {
             DispatchQueue.main.async {
                 self.isLoading = false
             }
-            print("Dashboard loaded successfully")
         }
         
         func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {

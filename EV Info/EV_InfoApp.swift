@@ -9,13 +9,13 @@ import SwiftUI
 
 @main
 struct EV_InfoApp: App {
-    @StateObject private var dataStore = DataStore()
+    @StateObject private var dataStore: DataStore
     @StateObject private var syncManager: SyncManager
-    
+
     init() {
         let dataStore = DataStore()
         _dataStore = StateObject(wrappedValue: dataStore)
-        
+
         // Load Databricks configuration from UserDefaults
         let workspaceURL = UserDefaults.standard.string(forKey: "databricksWorkspaceURL") ?? ""
         let keychain = DatabricksKeychain()
@@ -23,7 +23,7 @@ struct EV_InfoApp: App {
         let volumePath = UserDefaults.standard.string(forKey: "databricksVolumePath")
         let sqlWarehouseID = UserDefaults.standard.string(forKey: "databricksSQLWarehouseID")
         let tableName = UserDefaults.standard.string(forKey: "databricksTableName")
-        
+
         let config = DatabricksClient.Config(
             workspaceURL: workspaceURL,
             accessToken: accessToken,
@@ -33,15 +33,11 @@ struct EV_InfoApp: App {
             oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
             oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
         )
-        
-        print("DEBUG: App initialization - Config valid: \(config.isValid)")
-        print("DEBUG: workspaceURL: \(workspaceURL.isEmpty ? "EMPTY" : "PRESENT")")
-        print("DEBUG: accessToken: \(accessToken.isEmpty ? "EMPTY" : "PRESENT")")
-        
+
         let client = DatabricksClient(config: config)
         _syncManager = StateObject(wrappedValue: SyncManager(databricksClient: client, dataStore: dataStore))
     }
-    
+
     var body: some Scene {
         WindowGroup {
             ContentView(dataStore: dataStore, syncManager: syncManager)

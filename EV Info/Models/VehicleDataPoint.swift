@@ -55,15 +55,6 @@ struct VehicleDataPoint: Codable, Identifiable {
         try container.encode(syncedToDatabricks, forKey: .syncedToDatabricks)
     }
     
-    /// Initialize from existing VehicleData struct
-    init(from vehicleData: VehicleData) {
-        self.id = UUID()
-        self.timestamp = Date()
-        self.speedKmh = Int(vehicleData.speed)
-        self.currentAmps = vehicleData.batteryCurrent
-        self.voltageVolts = vehicleData.voltage
-    }
-    
     /// Initialize with timestamp
     init(timestamp: Date = Date()) {
         self.id = UUID()
