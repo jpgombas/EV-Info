@@ -6,6 +6,20 @@
 	<array>
 		<dict/>
 	</array>
+	<key>DATABRICKS_WORKSPACE_URL</key>
+	<string>$(DATABRICKS_WORKSPACE_URL)</string>
+	<key>DATABRICKS_ACCESS_TOKEN</key>
+	<string>$(DATABRICKS_ACCESS_TOKEN)</string>
+	<key>DATABRICKS_VOLUME_PATH</key>
+	<string>$(DATABRICKS_VOLUME_PATH)</string>
+	<key>DATABRICKS_OAUTH_CLIENT_ID</key>
+	<string>$(DATABRICKS_OAUTH_CLIENT_ID)</string>
+	<key>DATABRICKS_OAUTH_CLIENT_SECRET</key>
+	<string>$(DATABRICKS_OAUTH_CLIENT_SECRET)</string>
+	<key>DATABRICKS_DASHBOARD_ID</key>
+	<string>$(DATABRICKS_DASHBOARD_ID)</string>
+	<key>DATABRICKS_WORKSPACE_ID</key>
+	<string>$(DATABRICKS_WORKSPACE_ID)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>

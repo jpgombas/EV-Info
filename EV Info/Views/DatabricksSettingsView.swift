@@ -5,9 +5,9 @@ struct DatabricksSettingsView: View {
     @ObservedObject var networkMonitor: NetworkMonitor
     @ObservedObject var obd2Controller: OBD2Controller
     
-    @State private var workspaceURL = "https://dbc-44b8c99f-a387.cloud.databricks.com"
-    @State private var accessToken = "REDACTED_DATABRICKS_API_TOKEN"
-    @State private var volumePath = "/Volumes/vehicle_data/telemetry/uploads/incoming_csv"
+    @State private var workspaceURL = AppSecrets.databricksWorkspaceURL
+    @State private var accessToken = AppSecrets.databricksAccessToken
+    @State private var volumePath = AppSecrets.databricksVolumePath
     @State private var sqlWarehouseID = ""
     @State private var tableName = ""
     
@@ -254,8 +254,8 @@ struct DatabricksSettingsView: View {
             volumePath: volumePath.isEmpty ? nil : volumePath,
             sqlWarehouseID: sqlWarehouseID.isEmpty ? nil : sqlWarehouseID,
             tableName: tableName.isEmpty ? nil : tableName,
-            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
-            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
+            oauthClientId: AppSecrets.oauthClientId,
+            oauthClientSecret: AppSecrets.oauthClientSecret
         )
         
         let client = DatabricksClient(config: config)
@@ -286,8 +286,8 @@ struct DatabricksSettingsView: View {
             volumePath: volumePath.isEmpty ? nil : volumePath,
             sqlWarehouseID: sqlWarehouseID.isEmpty ? nil : sqlWarehouseID,
             tableName: tableName.isEmpty ? nil : tableName,
-            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
-            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
+            oauthClientId: AppSecrets.oauthClientId,
+            oauthClientSecret: AppSecrets.oauthClientSecret
         )
         
         let client = DatabricksClient(config: config)
@@ -318,8 +318,8 @@ struct DatabricksSettingsView: View {
         volumePath: "/Volumes/catalog/schema/volume",
         sqlWarehouseID: nil,
         tableName: nil,
-        oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
-        oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
+        oauthClientId: AppSecrets.oauthClientId,
+        oauthClientSecret: AppSecrets.oauthClientSecret
     )
     let client = DatabricksClient(config: config)
     let syncManager = SyncManager(databricksClient: client, dataStore: dataStore)

@@ -27,13 +27,25 @@
 		523CDEE02E61DE1F0083BB63 /* EV Info.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "EV Info.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		523CDEF02E61DE200083BB63 /* EV InfoTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "EV InfoTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
 		523CDEFA2E61DE200083BB63 /* EV InfoUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "EV InfoUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000012E000000SECRETS00 /* Secrets.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = "EV Info/Secrets.xcconfig"; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		523CDEE22E61DE1F0083BB63 /* EV Info */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				AA0000022E000000SECRETS00 /* Secrets.xcconfig */,
+			);
 			path = "EV Info";
 			sourceTree = "<group>";
+		};
+		AA0000022E000000SECRETS00 /* Secrets.xcconfig */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Secrets.xcconfig,
+				Secrets.xcconfig.template,
+			);
+			target = 523CDEDF2E61DE1F0083BB63 /* EV Info */;
 		};
 		523CDEF32E61DE200083BB63 /* EV InfoTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -75,6 +87,7 @@
 		523CDED72E61DE1E0083BB63 = {
 			isa = PBXGroup;
 			children = (
+				AA0000012E000000SECRETS00 /* Secrets.xcconfig */,
 				523CDEE22E61DE1F0083BB63 /* EV Info */,
 				523CDEF32E61DE200083BB63 /* EV InfoTests */,
 				523CDEFD2E61DE200083BB63 /* EV InfoUITests */,
@@ -271,6 +284,7 @@
 /* Begin XCBuildConfiguration section */
 		523CDF022E61DE200083BB63 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000012E000000SECRETS00 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
@@ -335,6 +349,7 @@
 		};
 		523CDF032E61DE200083BB63 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = AA0000012E000000SECRETS00 /* Secrets.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;

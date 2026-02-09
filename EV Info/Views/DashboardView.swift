@@ -70,8 +70,8 @@ struct DatabricksDashboardView: View {
     @State private var errorMessage: String?
     
     let databricksConfig: DatabricksClient.Config
-    let dashboardId = "REDACTED_DASHBOARD_ID"
-    let workspaceId = "REDACTED_WORKSPACE_ID"
+    let dashboardId = AppSecrets.databricksDashboardId
+    let workspaceId = AppSecrets.databricksWorkspaceId
     
     var body: some View {
         ZStack {

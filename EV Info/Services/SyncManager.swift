@@ -157,8 +157,8 @@ class SyncManager: ObservableObject {
             volumePath: volumePath?.isEmpty == false ? volumePath : nil,
             sqlWarehouseID: sqlWarehouseID?.isEmpty == false ? sqlWarehouseID : nil,
             tableName: tableName?.isEmpty == false ? tableName : nil,
-            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
-            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
+            oauthClientId: AppSecrets.oauthClientId,
+            oauthClientSecret: AppSecrets.oauthClientSecret
         )
         self.databricksClient = DatabricksClient(config: config)
     }

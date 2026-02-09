@@ -30,8 +30,8 @@ struct EV_InfoApp: App {
             volumePath: volumePath,
             sqlWarehouseID: sqlWarehouseID,
             tableName: tableName,
-            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
-            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
+            oauthClientId: AppSecrets.oauthClientId,
+            oauthClientSecret: AppSecrets.oauthClientSecret
         )
 
         let client = DatabricksClient(config: config)
