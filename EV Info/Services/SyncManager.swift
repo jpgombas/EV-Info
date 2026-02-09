@@ -11,9 +11,9 @@ class SyncManager: ObservableObject {
     @Published var pendingRecordCount = 0
     @Published var totalSyncedRecords = 0
     @Published var lastSyncError: String?
+    @Published var databricksClient: DatabricksClient
     
     // MARK: - Private Properties
-    private var databricksClient: DatabricksClient
     private let dataStore: DataStore
     private var syncTimer: Timer?
     private let autoSyncInterval: TimeInterval = 300 // 5 minute
@@ -38,7 +38,7 @@ class SyncManager: ObservableObject {
         }
     }
     
-    @Published var batchSize: Int {
+    @Published var batchSize = 40 {
         didSet {
             UserDefaults.standard.set(batchSize, forKey: "syncBatchSize")
         }
@@ -156,7 +156,9 @@ class SyncManager: ObservableObject {
             accessToken: accessToken,
             volumePath: volumePath?.isEmpty == false ? volumePath : nil,
             sqlWarehouseID: sqlWarehouseID?.isEmpty == false ? sqlWarehouseID : nil,
-            tableName: tableName?.isEmpty == false ? tableName : nil
+            tableName: tableName?.isEmpty == false ? tableName : nil,
+            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
+            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
         )
         self.databricksClient = DatabricksClient(config: config)
     }
@@ -164,25 +166,28 @@ class SyncManager: ObservableObject {
     // MARK: - Private Methods
     
     private func performSync() async {
-        // Prevent concurrent syncs
-        guard !isSyncing else { return }
-        
+        // Prevent concurrent syncs — check and set atomically on MainActor
+        let didStart = await MainActor.run { () -> Bool in
+            guard !isSyncing else { return false }
+            isSyncing = true
+            lastSyncError = nil
+            return true
+        }
+        guard didStart else { return }
+
         // Check WiFi requirement
         if syncOnlyOnWiFi && !networkMonitor.isOnWiFi {
             print("Skipping sync: WiFi required but not connected")
+            await MainActor.run { isSyncing = false }
             return
         }
-        
+
         // Check if there's data to sync
         let currentPendingCount = updatePendingCount()
         guard currentPendingCount > 0 else {
             print("No pending records to sync")
+            await MainActor.run { isSyncing = false }
             return
-        }
-        
-        await MainActor.run {
-            isSyncing = true
-            lastSyncError = nil
         }
         
         do {

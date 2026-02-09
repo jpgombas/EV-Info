@@ -3,14 +3,21 @@ import CoreData
 
 /// Manages local persistence of vehicle data using CoreData
 class DataStore: ObservableObject {
-    
+
     // MARK: - Published Properties
     @Published var recentDataPoints: [VehicleDataPoint] = []
-    
+
     // MARK: - Core Data Stack
     private let persistentContainer: NSPersistentContainer
     private let context: NSManagedObjectContext
-    
+
+    /// Background context for sync operations — avoids concurrent access to viewContext
+    private lazy var backgroundContext: NSManagedObjectContext = {
+        let ctx = persistentContainer.newBackgroundContext()
+        ctx.automaticallyMergesChangesFromParent = true
+        return ctx
+    }()
+
     // MARK: - Initialization
     init() {
         // Initialize Core Data stack
@@ -20,34 +27,36 @@ class DataStore: ObservableObject {
                 fatalError("Failed to load Core Data stack: \(error)")
             }
         }
-        
+
         context = persistentContainer.viewContext
         context.automaticallyMergesChangesFromParent = true
-        
+
         // Load recent data points
         loadRecentDataPoints()
     }
     
     // MARK: - CRUD Operations
     
-    /// Save a new data point
+    /// Save a new data point (must be called from main thread)
     func saveDataPoint(_ dataPoint: VehicleDataPoint) {
-        let entity = VehicleDataEntity(context: context)
-        entity.id = dataPoint.id
-        entity.timestamp = dataPoint.timestamp
-        entity.soc = dataPoint.soc ?? 0
-        entity.speedKmh = Int16(dataPoint.speedKmh ?? 0)
-        entity.currentAmps = dataPoint.currentAmps ?? 0
-        entity.voltageVolts = dataPoint.voltageVolts ?? 0
-        entity.ambientTempF = dataPoint.ambientTempF ?? 0
-        
-        if let distanceMiles = dataPoint.distanceMi {
-            entity.distanceKm = distanceMiles * 1.60934
+        context.perform {
+            let entity = VehicleDataEntity(context: self.context)
+            entity.id = dataPoint.id
+            entity.timestamp = dataPoint.timestamp
+            entity.soc = dataPoint.soc ?? 0
+            entity.speedKmh = Int16(dataPoint.speedKmh ?? 0)
+            entity.currentAmps = dataPoint.currentAmps ?? 0
+            entity.voltageVolts = dataPoint.voltageVolts ?? 0
+            entity.ambientTempF = dataPoint.ambientTempF ?? 0
+
+            if let distanceMiles = dataPoint.distanceMi {
+                entity.distanceKm = distanceMiles * 1.60934
+            }
+            entity.syncedToDatabricks = false
+
+            self.saveContext()
+            self.loadRecentDataPoints()
         }
-        entity.syncedToDatabricks = false
-        
-        saveContext()
-        loadRecentDataPoints()
     }
     
     /// Save multiple data points
@@ -57,48 +66,58 @@ class DataStore: ObservableObject {
         }
     }
     
-    /// Get all unsynced records
+    /// Get all unsynced records (thread-safe — uses background context)
     func getUnsyncedRecords(limit: Int = 100) -> [VehicleDataPoint] {
-        let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "syncedToDatabricks == NO")
-        fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
-        fetchRequest.fetchLimit = limit
-        
-        do {
-            let entities = try context.fetch(fetchRequest)
-            return entities.map { $0.toVehicleDataPoint() }
-        } catch {
-            print("Error fetching unsynced records: \(error)")
-            return []
-        }
-    }
-    
-    /// Get count of unsynced records
-    func getUnsyncedRecordCount() -> Int {
-        let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "syncedToDatabricks == NO")
-        
-        do {
-            return try context.count(for: fetchRequest)
-        } catch {
-            print("Error counting unsynced records: \(error)")
-            return 0
-        }
-    }
-    
-    /// Mark records as synced
-    func markRecordsAsSynced(_ ids: [UUID]) {
-        let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
-        fetchRequest.predicate = NSPredicate(format: "id IN %@", ids)
-        
-        do {
-            let entities = try context.fetch(fetchRequest)
-            for entity in entities {
-                entity.syncedToDatabricks = true
+        var results: [VehicleDataPoint] = []
+        backgroundContext.performAndWait {
+            let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "syncedToDatabricks == NO")
+            fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: true)]
+            fetchRequest.fetchLimit = limit
+
+            do {
+                let entities = try backgroundContext.fetch(fetchRequest)
+                results = entities.map { $0.toVehicleDataPoint() }
+            } catch {
+                print("Error fetching unsynced records: \(error)")
             }
-            saveContext()
-        } catch {
-            print("Error marking records as synced: \(error)")
+        }
+        return results
+    }
+
+    /// Get count of unsynced records (thread-safe — uses background context)
+    func getUnsyncedRecordCount() -> Int {
+        var count = 0
+        backgroundContext.performAndWait {
+            let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "syncedToDatabricks == NO")
+
+            do {
+                count = try backgroundContext.count(for: fetchRequest)
+            } catch {
+                print("Error counting unsynced records: \(error)")
+            }
+        }
+        return count
+    }
+
+    /// Mark records as synced (thread-safe — uses background context)
+    func markRecordsAsSynced(_ ids: [UUID]) {
+        backgroundContext.performAndWait {
+            let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
+            fetchRequest.predicate = NSPredicate(format: "id IN %@", ids)
+
+            do {
+                let entities = try backgroundContext.fetch(fetchRequest)
+                for entity in entities {
+                    entity.syncedToDatabricks = true
+                }
+                if backgroundContext.hasChanges {
+                    try backgroundContext.save()
+                }
+            } catch {
+                print("Error marking records as synced: \(error)")
+            }
         }
     }
     

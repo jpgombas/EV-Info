@@ -6,17 +6,25 @@ class DatabricksClient {
     // MARK: - Configuration
     struct Config {
         let workspaceURL: String  // e.g., "https://your-workspace.cloud.databricks.com"
-        let accessToken: String   // Personal Access Token
+        let accessToken: String   // Personal Access Token (for API calls)
         let volumePath: String?   // Optional: Unity Catalog volume path
         let sqlWarehouseID: String? // Optional: SQL Warehouse endpoint
         let tableName: String?    // Optional: Target table name
         
+        // OAuth credentials for dashboard embedding
+        let oauthClientId: String?     // Service Principal client ID
+        let oauthClientSecret: String? // Service Principal OAuth secret
+        
         var isValid: Bool {
             return !workspaceURL.isEmpty && !accessToken.isEmpty
         }
+        
+        var hasOAuthCredentials: Bool {
+            return oauthClientId != nil && oauthClientSecret != nil
+        }
     }
     
-    private var config: Config
+    @Published var config: Config
     
     init(config: Config) {
         self.config = config
@@ -177,6 +185,89 @@ class DatabricksClient {
     
     // MARK: - Validation
     
+    /// Generate a dashboard-scoped OAuth token for embedding (3-step flow)
+    func generateEmbeddingToken(dashboardId: String, externalViewerId: String? = nil, externalValue: String? = nil) async throws -> EmbeddingTokenResponse {
+        guard config.hasOAuthCredentials,
+              let clientId = config.oauthClientId,
+              let clientSecret = config.oauthClientSecret else {
+            throw DatabricksError.invalidConfiguration
+        }
+
+        let basicAuth: String = {
+            let credentials = "\(clientId):\(clientSecret)"
+            return "Basic \(credentials.data(using: .utf8)!.base64EncodedString())"
+        }()
+
+        // Step 1: Get a broad all-apis token via client_credentials
+        let step1URL = URL(string: "\(config.workspaceURL)/oidc/v1/token")!
+        var step1Request = URLRequest(url: step1URL)
+        step1Request.httpMethod = "POST"
+        step1Request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        step1Request.setValue(basicAuth, forHTTPHeaderField: "Authorization")
+        step1Request.httpBody = "grant_type=client_credentials&scope=all-apis".data(using: .utf8)
+
+        let (step1Data, step1Response) = try await URLSession.shared.data(for: step1Request)
+        guard let step1Http = step1Response as? HTTPURLResponse,
+              step1Http.statusCode >= 200 && step1Http.statusCode < 300 else {
+            let msg = String(data: step1Data, encoding: .utf8) ?? "Unknown error"
+            throw DatabricksError.authenticationFailed(message: "Step 1 failed: \(msg)")
+        }
+        let step1Token = try JSONDecoder().decode(EmbeddingTokenResponse.self, from: step1Data)
+
+        // Step 2: Call /tokeninfo to get authorization_details scoped to the dashboard
+        var step2Components = URLComponents(string: "\(config.workspaceURL)/api/2.0/lakeview/dashboards/\(dashboardId)/published/tokeninfo")!
+        var queryItems: [URLQueryItem] = []
+        if let viewerId = externalViewerId {
+            queryItems.append(URLQueryItem(name: "external_viewer_id", value: viewerId))
+        }
+        if let value = externalValue {
+            queryItems.append(URLQueryItem(name: "external_value", value: value))
+        }
+        if !queryItems.isEmpty {
+            step2Components.queryItems = queryItems
+        }
+
+        var step2Request = URLRequest(url: step2Components.url!)
+        step2Request.httpMethod = "GET"
+        step2Request.setValue("Bearer \(step1Token.accessToken)", forHTTPHeaderField: "Authorization")
+
+        let (step2Data, step2Response) = try await URLSession.shared.data(for: step2Request)
+        guard let step2Http = step2Response as? HTTPURLResponse,
+              step2Http.statusCode >= 200 && step2Http.statusCode < 300 else {
+            let msg = String(data: step2Data, encoding: .utf8) ?? "Unknown error"
+            throw DatabricksError.authenticationFailed(message: "Step 2 (tokeninfo) failed: \(msg)")
+        }
+
+        // Parse the authorization_details JSON from the tokeninfo response
+        guard let tokenInfo = try JSONSerialization.jsonObject(with: step2Data) as? [String: Any],
+              let authorizationDetails = tokenInfo["authorization_details"] else {
+            throw DatabricksError.invalidResponse
+        }
+        let authDetailsJSON = try JSONSerialization.data(withJSONObject: authorizationDetails)
+        let authDetailsString = String(data: authDetailsJSON, encoding: .utf8) ?? "[]"
+
+        // Step 3: Generate a tightly-scoped token using the authorization_details
+        let step3URL = URL(string: "\(config.workspaceURL)/oidc/v1/token")!
+        var step3Request = URLRequest(url: step3URL)
+        step3Request.httpMethod = "POST"
+        step3Request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        step3Request.setValue(basicAuth, forHTTPHeaderField: "Authorization")
+
+        let encodedAuthDetails = authDetailsString.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let step3FormData = "grant_type=client_credentials&authorization_details=\(encodedAuthDetails)"
+        step3Request.httpBody = step3FormData.data(using: .utf8)
+
+        let (step3Data, step3Response) = try await URLSession.shared.data(for: step3Request)
+        guard let step3Http = step3Response as? HTTPURLResponse,
+              step3Http.statusCode >= 200 && step3Http.statusCode < 300 else {
+            let msg = String(data: step3Data, encoding: .utf8) ?? "Unknown error"
+            throw DatabricksError.authenticationFailed(message: "Step 3 (scoped token) failed: \(msg)")
+        }
+
+        let scopedToken = try JSONDecoder().decode(EmbeddingTokenResponse.self, from: step3Data)
+        return scopedToken
+    }
+    
     /// Test connection to Databricks
     func testConnection() async throws -> Bool {
         let url = URL(string: "\(config.workspaceURL)/api/2.0/clusters/list")!
@@ -234,6 +325,18 @@ struct UploadResponse {
     let message: String
 }
 
+struct EmbeddingTokenResponse: Codable {
+    let accessToken: String
+    let tokenType: String
+    let expiresIn: Int
+    
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case tokenType = "token_type"
+        case expiresIn = "expires_in"
+    }
+}
+
 // MARK: - Errors
 
 enum DatabricksError: LocalizedError {
@@ -241,7 +344,7 @@ enum DatabricksError: LocalizedError {
     case dataConversionFailed
     case invalidResponse
     case uploadFailed(statusCode: Int, message: String)
-    case authenticationFailed
+    case authenticationFailed(message: String)
     case networkError(Error)
     
     var errorDescription: String? {
@@ -254,8 +357,8 @@ enum DatabricksError: LocalizedError {
             return "Received invalid response from Databricks"
         case .uploadFailed(let statusCode, let message):
             return "Upload failed with status \(statusCode): \(message)"
-        case .authenticationFailed:
-            return "Authentication failed. Check your access token."
+        case .authenticationFailed(let message):
+            return "Authentication failed: \(message)"
         case .networkError(let error):
             return "Network error: \(error.localizedDescription)"
         }

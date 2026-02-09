@@ -45,7 +45,8 @@ struct ContentView: View {
                         connection: connection,
                         controller: controller,
                         logger: logger,
-                        syncManager: syncManager 
+                        syncManager: syncManager,
+                        databricksConfig: syncManager.databricksClient.config
                     )
                     .tag(AppView.dashboard)
                     
@@ -71,3 +72,4 @@ struct ContentView: View {
         }
     }
 }
+

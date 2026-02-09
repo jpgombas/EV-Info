@@ -7,7 +7,7 @@ struct DatabricksSettingsView: View {
     
     @State private var workspaceURL = "https://dbc-44b8c99f-a387.cloud.databricks.com"
     @State private var accessToken = "REDACTED_DATABRICKS_API_TOKEN"
-    @State private var volumePath = "/Volumes/vehicle_data/telemetry/uploads"
+    @State private var volumePath = "/Volumes/vehicle_data/telemetry/uploads/incoming_csv"
     @State private var sqlWarehouseID = ""
     @State private var tableName = ""
     
@@ -253,7 +253,9 @@ struct DatabricksSettingsView: View {
             accessToken: accessToken,
             volumePath: volumePath.isEmpty ? nil : volumePath,
             sqlWarehouseID: sqlWarehouseID.isEmpty ? nil : sqlWarehouseID,
-            tableName: tableName.isEmpty ? nil : tableName
+            tableName: tableName.isEmpty ? nil : tableName,
+            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
+            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
         )
         
         let client = DatabricksClient(config: config)
@@ -283,7 +285,9 @@ struct DatabricksSettingsView: View {
             accessToken: accessToken,
             volumePath: volumePath.isEmpty ? nil : volumePath,
             sqlWarehouseID: sqlWarehouseID.isEmpty ? nil : sqlWarehouseID,
-            tableName: tableName.isEmpty ? nil : tableName
+            tableName: tableName.isEmpty ? nil : tableName,
+            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
+            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
         )
         
         let client = DatabricksClient(config: config)
@@ -313,7 +317,9 @@ struct DatabricksSettingsView: View {
         accessToken: "dapi...",
         volumePath: "/Volumes/catalog/schema/volume",
         sqlWarehouseID: nil,
-        tableName: nil
+        tableName: nil,
+        oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
+        oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
     )
     let client = DatabricksClient(config: config)
     let syncManager = SyncManager(databricksClient: client, dataStore: dataStore)

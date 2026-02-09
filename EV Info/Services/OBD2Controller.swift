@@ -28,7 +28,7 @@ class OBD2Controller: ObservableObject {
     private var lastDistanceUpdate = Date()
     private var initialLongDistance: Double?  // Track starting distance for relative calculation
     
-    @Published var dataTimerDuration = 1.0 {
+    @Published var dataTimerDuration = 0.8 {
         didSet {
             // Restart the data timer with the new duration if it's currently running
             if dataTimer != nil {
@@ -251,8 +251,6 @@ class OBD2Controller: ObservableObject {
             currentDataPoint.distanceMi = longdistance
         case .ambientTemperature(let fahrenheit):
             currentDataPoint.ambientTempF = fahrenheit
-        default:
-            break
         }
         
         // Save data point periodically (based on timer duration and command count)
@@ -305,3 +303,4 @@ class OBD2Controller: ObservableObject {
         stopAllTimers()
     }
 }
+

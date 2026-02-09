@@ -29,7 +29,9 @@ struct EV_InfoApp: App {
             accessToken: accessToken,
             volumePath: volumePath,
             sqlWarehouseID: sqlWarehouseID,
-            tableName: tableName
+            tableName: tableName,
+            oauthClientId: "REDACTED_OAUTH_CLIENT_ID",
+            oauthClientSecret: "REDACTED_OAUTH_CLIENT_SECRET"
         )
         
         print("DEBUG: App initialization - Config valid: \(config.isValid)")
