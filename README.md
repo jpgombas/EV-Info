@@ -203,4 +203,4 @@ The non-standard PIDs (22xxxx) are manufacturer-specific. The parsing formulas i
 
 ## License
 
-Private project. Not currently licensed for distribution.
+This project is licensed under the [MIT License](LICENSE).
