@@ -43,15 +43,12 @@ class DataStore: ObservableObject {
             let entity = VehicleDataEntity(context: self.context)
             entity.id = dataPoint.id
             entity.timestamp = dataPoint.timestamp
-            entity.soc = dataPoint.soc ?? 0
-            entity.speedKmh = Int16(dataPoint.speedKmh ?? 0)
-            entity.currentAmps = dataPoint.currentAmps ?? 0
-            entity.voltageVolts = dataPoint.voltageVolts ?? 0
-            entity.ambientTempF = dataPoint.ambientTempF ?? 0
-
-            if let distanceMiles = dataPoint.distanceMi {
-                entity.distanceKm = distanceMiles * 1.60934
-            }
+            entity.soc = dataPoint.soc.map { NSNumber(value: $0) }
+            entity.speedKmh = dataPoint.speedKmh.map { NSNumber(value: Int16($0)) }
+            entity.currentAmps = dataPoint.currentAmps.map { NSNumber(value: $0) }
+            entity.voltageVolts = dataPoint.voltageVolts.map { NSNumber(value: $0) }
+            entity.ambientTempF = dataPoint.ambientTempF.map { NSNumber(value: $0) }
+            entity.distanceKm = dataPoint.distanceMi.map { NSNumber(value: $0 * 1.60934) }
             entity.syncedToDatabricks = false
 
             self.saveContext()
@@ -218,14 +215,14 @@ extension VehicleDataEntity {
     func toVehicleDataPoint() -> VehicleDataPoint {
         let dataPointID = id ?? UUID()
         var dataPoint = VehicleDataPoint(id: dataPointID, timestamp: timestamp ?? Date())
-        dataPoint.soc = soc
-        dataPoint.speedKmh = Int(speedKmh)
-        dataPoint.currentAmps = currentAmps
-        dataPoint.voltageVolts = voltageVolts
-        dataPoint.ambientTempF = ambientTempF
-        dataPoint.distanceMi = distanceKm * 0.621371
+        dataPoint.soc = soc?.doubleValue
+        dataPoint.speedKmh = speedKmh?.intValue
+        dataPoint.currentAmps = currentAmps?.doubleValue
+        dataPoint.voltageVolts = voltageVolts?.doubleValue
+        dataPoint.ambientTempF = ambientTempF?.doubleValue
+        dataPoint.distanceMi = distanceKm.map { $0.doubleValue * 0.621371 }
         dataPoint.syncedToDatabricks = syncedToDatabricks
-        
+
         return dataPoint
     }
 }

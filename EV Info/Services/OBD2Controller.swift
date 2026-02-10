@@ -28,13 +28,40 @@ class OBD2Controller: ObservableObject {
     
     @Published var dataTimerDuration = 0.8 {
         didSet {
-            // Restart the data timer with the new duration if it's currently running
             if dataTimer != nil {
                 restartDataTimer()
             }
         }
     }
-    
+
+    @Published var fastPollingEnabled = false {
+        didSet {
+            if dataTimer != nil {
+                currentCommandIndex = 0
+                needsHeaderRestore = false
+                if fastPollingEnabled {
+                    // Start with a full sweep to get initial readings
+                    isDoingFullSweep = true
+                    fullSweepCommandIndex = 0
+                    lastFullSweepTime = Date()
+                } else {
+                    isDoingFullSweep = false
+                    lastFullSweepTime = Date()
+                }
+                restartDataTimer()
+                logger.log(.info, fastPollingEnabled ? "Fast polling enabled (current only)" : "Fast polling disabled (normal mode)")
+            }
+        }
+    }
+
+    // Fast polling state
+    private let fastCommand = "222414"  // Current PID (header already set to 7E1 after sweep)
+    private var lastFullSweepTime = Date()
+    private let fullSweepInterval: TimeInterval = 300  // 5 minutes
+    private var isDoingFullSweep = false
+    private var fullSweepCommandIndex = 0
+    private var needsHeaderRestore = false  // Send ATSH7E1 once after full sweep
+
     // Data collection
     private var currentDataPoint = VehicleDataPoint(timestamp: Date())
     
@@ -116,11 +143,23 @@ class OBD2Controller: ObservableObject {
     }
     
     private func startDataFetching() {
-        logger.log(.info, "Starting periodic data fetching")
-        
+        logger.log(.info, "Starting periodic data fetching\(fastPollingEnabled ? " (fast mode)" : "")")
+
         dataTimer?.invalidate()
         currentCommandIndex = 0
         isWaitingForResponse = false
+        fullSweepCommandIndex = 0
+        needsHeaderRestore = false
+
+        if fastPollingEnabled {
+            // Start with a full sweep to get initial readings for all values
+            isDoingFullSweep = true
+            lastFullSweepTime = Date()
+            logger.log(.info, "Starting initial full sweep before fast polling")
+        } else {
+            isDoingFullSweep = false
+            lastFullSweepTime = Date()
+        }
         
         dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
@@ -144,21 +183,55 @@ class OBD2Controller: ObservableObject {
             dataTimer?.invalidate()
             return
         }
-        
+
         if isWaitingForResponse {
             logger.log(.verbose, "Skipping cycle - waiting for response")
             return
         }
-        
-        let command = fetchCommands[currentCommandIndex]
+
+        let command: String
+
+        if fastPollingEnabled {
+            if isDoingFullSweep {
+                // During a full sweep, cycle through all fetchCommands
+                command = fetchCommands[fullSweepCommandIndex]
+                fullSweepCommandIndex += 1
+                if fullSweepCommandIndex >= fetchCommands.count {
+                    // Full sweep complete — need to restore header to 7E1 for fast current polling
+                    fullSweepCommandIndex = 0
+                    isDoingFullSweep = false
+                    needsHeaderRestore = true
+                    lastFullSweepTime = Date()
+                    logger.log(.info, "Full sweep complete, restoring header for fast polling")
+                }
+            } else if needsHeaderRestore {
+                // Restore CAN header to 7E1 (battery/inverter) after full sweep
+                command = "ATSH7E1"
+                needsHeaderRestore = false
+                logger.log(.verbose, "Restoring header to 7E1 for fast polling")
+            } else if Date().timeIntervalSince(lastFullSweepTime) >= fullSweepInterval {
+                // Time for a full sweep
+                isDoingFullSweep = true
+                fullSweepCommandIndex = 0
+                command = fetchCommands[fullSweepCommandIndex]
+                fullSweepCommandIndex += 1
+                logger.log(.info, "Starting full sweep (5 min interval)")
+            } else {
+                // Fast mode: just send the current PID (header already set to 7E1)
+                command = fastCommand
+            }
+        } else {
+            // Normal mode: round-robin through all commands
+            command = fetchCommands[currentCommandIndex]
+            currentCommandIndex = (currentCommandIndex + 1) % fetchCommands.count
+        }
+
         let data = (command + "\r").data(using: .utf8)!
-        
+
         logger.log(.verbose, "Sending: \(command)")
         connection.writeData(data)
         isWaitingForResponse = true
-        
-        currentCommandIndex = (currentCommandIndex + 1) % fetchCommands.count
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self = self else { return }
             if self.isWaitingForResponse {
@@ -254,7 +327,8 @@ class OBD2Controller: ObservableObject {
         }
         
         // Save data point periodically (based on timer duration and command count)
-        let saveInterval = dataTimerDuration * Double(fetchCommands.count) * 1.2
+        let commandCount = (fastPollingEnabled && !isDoingFullSweep) ? 1 : fetchCommands.count
+        let saveInterval = dataTimerDuration * Double(commandCount) * 1.2
         if Date().timeIntervalSince(currentDataPoint.timestamp) >= saveInterval {
             saveCurrentDataPoint()
         }
