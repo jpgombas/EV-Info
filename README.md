@@ -1,6 +1,6 @@
 # EV Info
 
-An iOS app that connects to electric vehicles via Bluetooth OBD2, displays real-time telemetry on a live dashboard, and syncs collected data to Databricks for long-term analytics.
+An iOS app that connects to electric vehicles via Bluetooth OBD2, displays real-time telemetry on a live dashboard, and syncs collected data to Databricks for long-term analytics. This is a personal project to extract detailed measurments of efficiency depending on ambient temperature, speed and state of charge for an electric vehicle. 
 
 Built with SwiftUI, CoreBluetooth, and CoreData. Targets iOS 18.1+.
 
