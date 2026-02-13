@@ -49,6 +49,16 @@ class DataStore: ObservableObject {
             entity.voltageVolts = dataPoint.voltageVolts.map { NSNumber(value: $0) }
             entity.ambientTempF = dataPoint.ambientTempF.map { NSNumber(value: $0) }
             entity.distanceKm = dataPoint.distanceMi.map { NSNumber(value: $0 * 1.60934) }
+            entity.socHD = dataPoint.socHD.map { NSNumber(value: $0) }
+            entity.batteryAvgTempC = dataPoint.batteryAvgTempC.map { NSNumber(value: $0) }
+            entity.batteryMaxTempC = dataPoint.batteryMaxTempC.map { NSNumber(value: $0) }
+            entity.batteryMinTempC = dataPoint.batteryMinTempC.map { NSNumber(value: $0) }
+            entity.batteryCoolantTempC = dataPoint.batteryCoolantTempC.map { NSNumber(value: $0) }
+            entity.hvacMeasuredPowerW = dataPoint.hvacMeasuredPowerW.map { NSNumber(value: $0) }
+            entity.hvacCommandedPowerW = dataPoint.hvacCommandedPowerW.map { NSNumber(value: $0) }
+            entity.acCompressorOn = dataPoint.acCompressorOn.map { NSNumber(value: $0) }
+            entity.batteryCapacityAh = dataPoint.batteryCapacityAh.map { NSNumber(value: $0) }
+            entity.batteryResistanceMOhm = dataPoint.batteryResistanceMOhm.map { NSNumber(value: $0) }
             entity.syncedToDatabricks = false
 
             self.saveContext()
@@ -221,6 +231,16 @@ extension VehicleDataEntity {
         dataPoint.voltageVolts = voltageVolts?.doubleValue
         dataPoint.ambientTempF = ambientTempF?.doubleValue
         dataPoint.distanceMi = distanceKm.map { $0.doubleValue * 0.621371 }
+        dataPoint.socHD = socHD?.doubleValue
+        dataPoint.batteryAvgTempC = batteryAvgTempC?.doubleValue
+        dataPoint.batteryMaxTempC = batteryMaxTempC?.doubleValue
+        dataPoint.batteryMinTempC = batteryMinTempC?.doubleValue
+        dataPoint.batteryCoolantTempC = batteryCoolantTempC?.doubleValue
+        dataPoint.hvacMeasuredPowerW = hvacMeasuredPowerW?.doubleValue
+        dataPoint.hvacCommandedPowerW = hvacCommandedPowerW?.doubleValue
+        dataPoint.acCompressorOn = acCompressorOn?.boolValue
+        dataPoint.batteryCapacityAh = batteryCapacityAh?.doubleValue
+        dataPoint.batteryResistanceMOhm = batteryResistanceMOhm?.doubleValue
         dataPoint.syncedToDatabricks = syncedToDatabricks
 
         return dataPoint

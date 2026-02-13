@@ -13,19 +13,18 @@ class OBD2Controller: ObservableObject {
     private let parser: OBD2Parser
     private let logger: Logger
     private let dataStore: DataStore?
-    
+
     @Published var vehicleData = VehicleData()
-    
+
     // Timers and state
     private var dataTimer: Timer?
     private var initResponseTimer: Timer?
-    private var currentCommandIndex = 0
     private var isWaitingForResponse = false
     private var responseBuffer = ""
     private var initCommandIndex = 0
     private var isInitializing = false
     private var initialLongDistance: Double?  // Track starting distance for relative calculation
-    
+
     @Published var dataTimerDuration = 0.8 {
         didSet {
             if dataTimer != nil {
@@ -34,65 +33,65 @@ class OBD2Controller: ObservableObject {
         }
     }
 
-    @Published var fastPollingEnabled = false {
-        didSet {
-            if dataTimer != nil {
-                currentCommandIndex = 0
-                needsHeaderRestore = false
-                if fastPollingEnabled {
-                    // Start with a full sweep to get initial readings
-                    isDoingFullSweep = true
-                    fullSweepCommandIndex = 0
-                    lastFullSweepTime = Date()
-                } else {
-                    isDoingFullSweep = false
-                    lastFullSweepTime = Date()
-                }
-                restartDataTimer()
-                logger.log(.info, fastPollingEnabled ? "Fast polling enabled (current only)" : "Fast polling disabled (normal mode)")
-            }
-        }
-    }
-
-    // Fast polling state
-    private let fastCommand = "222414"  // Current PID (header already set to 7E1 after sweep)
-    private var lastFullSweepTime = Date()
-    private let fullSweepInterval: TimeInterval = 300  // 5 minutes
-    private var isDoingFullSweep = false
-    private var fullSweepCommandIndex = 0
-    private var needsHeaderRestore = false  // Send ATSH7E1 once after full sweep
-
     // Data collection
     private var currentDataPoint = VehicleDataPoint(timestamp: Date())
-    
+
+    // Tiered polling cycle tracking
+    private var cycleCount = 0
+    private let slowCycleInterval = 10  // Run slow tier every 5th cycle
+    private var lastTripPollTime = Date.distantPast  // Force trip poll on first cycle
+    private let tripPollInterval: TimeInterval = 600  // 10 minutes
+
+    // Current command queue for this cycle
+    private var currentCommandQueue: [String] = []
+    private var currentQueueIndex = 0
+
     // Commands
-    private let initCommands = ["ATZ", "ATD", "ATE0", "ATS0", "ATAL", "ATSP6"]
-    private let fetchCommands = [
-        "ATSH7E0",  // (ECU 0x7E0)
-        "010D",     // Vehicle speed
-        "0131",    // Distance traveled
-        "220046",  // Ambient air temperature
-        "ATSH7E1", //(ECU 0x7E1)
-        "222414",   // Current
-        "222885",   // Voltage
-        "ATSH7E4",  // Switch header to BMS
-        "228334"    // State of charge (BMS ECU)
+    private let initCommands = ["ATZ", "ATE0", "ATL0", "ATS0", "ATH1", "ATSP6", "ATST96", "ATSH7E4"]
+
+    // Fast tier: polled every cycle, all on BECM (7E4)
+    private let fastCommands = [
+        "2240D4",   // HV Battery Current (HD)
+        "222885",   // HV Pack Voltage
+        "22000D",   // Vehicle Speed (UDS on BECM)
     ]
-    
+
+    private let slowCommands = [
+        "2243AF",   // SOC HD (raw)
+        "228334",   // SOC Displayed
+        "22434F",   // Battery avg temp
+        "224349",   // Battery max temp
+        "22434A",   // Battery min temp
+        "2241A4",   // Battery coolant temp
+        "2241B2",   // HVAC measured power
+        "2241B1",   // HVAC commanded power
+        "22451F",   // A/C compressor on/off
+        // Header switch for distance & ambient temp
+        "ATSH7DF",  // Switch to broadcast
+        "0131",     // Distance traveled
+        "0146",     // Ambient air temperature
+        "ATSH7E4",  // Restore BECM header
+    ]
+
+    private let tripCommands = [
+        "2245F9",   // Battery capacity (Ah)
+        "224357",   // Battery resistance (mΩ)
+    ]
+
     init(connection: BLEConnection, parser: OBD2Parser, logger: Logger, dataStore: DataStore? = nil) {
         self.connection = connection
         self.parser = parser
         self.logger = logger
         self.dataStore = dataStore
-        
+
         setupConnectionCallbacks()
     }
-    
+
     private func setupConnectionCallbacks() {
         connection.onDataReceived = { [weak self] data in
             self?.handleReceivedData(data)
         }
-        
+
         connection.onConnectionStateChanged = { [weak self] isConnected in
             if isConnected {
                 self?.startInitSequence()
@@ -101,30 +100,30 @@ class OBD2Controller: ObservableObject {
             }
         }
     }
-    
+
     private func startInitSequence() {
         logger.log(.info, "Starting OBD2 initialization (\(initCommands.count) commands)")
         initCommandIndex = 0
         isInitializing = true
         sendNextInitCommand()
     }
-    
+
     private func sendNextInitCommand() {
         guard initCommandIndex < initCommands.count, isInitializing else { return }
-        
+
         let command = initCommands[initCommandIndex]
         logger.log(.verbose, "Init (\(initCommandIndex + 1)/\(initCommands.count)): \(command)")
-        
+
         let data = (command + "\r").data(using: .utf8)!
         connection.writeData(data)
-        
+
         initResponseTimer?.invalidate()
         initResponseTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
             self?.logger.log(.warning, "Init timeout: \(command)")
             self?.continueInitSequence()
         }
     }
-    
+
     private func continueInitSequence() {
         initResponseTimer?.invalidate()
         initCommandIndex += 1
@@ -141,42 +140,53 @@ class OBD2Controller: ObservableObject {
             }
         }
     }
-    
+
+    // MARK: - Command Queue Building
+
+    private func buildCommandQueue() -> [String] {
+        var commands = fastCommands
+
+        if cycleCount % slowCycleInterval == 0 {
+            commands += slowCommands
+        }
+
+        if Date().timeIntervalSince(lastTripPollTime) >= tripPollInterval {
+            commands += tripCommands
+            lastTripPollTime = Date()
+        }
+
+        return commands
+    }
+
+    // MARK: - Data Fetching
+
     private func startDataFetching() {
-        logger.log(.info, "Starting periodic data fetching\(fastPollingEnabled ? " (fast mode)" : "")")
+        logger.log(.info, "Starting periodic data fetching")
 
         dataTimer?.invalidate()
-        currentCommandIndex = 0
         isWaitingForResponse = false
-        fullSweepCommandIndex = 0
-        needsHeaderRestore = false
+        cycleCount = 0
+        lastTripPollTime = Date.distantPast  // Force trip poll on first cycle
 
-        if fastPollingEnabled {
-            // Start with a full sweep to get initial readings for all values
-            isDoingFullSweep = true
-            lastFullSweepTime = Date()
-            logger.log(.info, "Starting initial full sweep before fast polling")
-        } else {
-            isDoingFullSweep = false
-            lastFullSweepTime = Date()
-        }
-        
+        currentCommandQueue = buildCommandQueue()
+        currentQueueIndex = 0
+
         dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
         }
     }
-    
+
     private func restartDataTimer() {
         guard connection.isConnected, dataTimer != nil else { return }
-        
+
         logger.log(.info, "Restarting data timer with new duration: \(dataTimerDuration)s")
         dataTimer?.invalidate()
-        
+
         dataTimer = Timer.scheduledTimer(withTimeInterval: dataTimerDuration, repeats: true) { [weak self] timer in
             self?.sendNextDataCommand()
         }
     }
-    
+
     private func sendNextDataCommand() {
         guard connection.isConnected else {
             logger.log(.warning, "Data timer stopped - not connected")
@@ -189,49 +199,27 @@ class OBD2Controller: ObservableObject {
             return
         }
 
-        let command: String
-
-        if fastPollingEnabled {
-            if isDoingFullSweep {
-                // During a full sweep, cycle through all fetchCommands
-                command = fetchCommands[fullSweepCommandIndex]
-                fullSweepCommandIndex += 1
-                if fullSweepCommandIndex >= fetchCommands.count {
-                    // Full sweep complete — need to restore header to 7E1 for fast current polling
-                    fullSweepCommandIndex = 0
-                    isDoingFullSweep = false
-                    needsHeaderRestore = true
-                    lastFullSweepTime = Date()
-                    logger.log(.info, "Full sweep complete, restoring header for fast polling")
-                }
-            } else if needsHeaderRestore {
-                // Restore CAN header to 7E1 (battery/inverter) after full sweep
-                command = "ATSH7E1"
-                needsHeaderRestore = false
-                logger.log(.verbose, "Restoring header to 7E1 for fast polling")
-            } else if Date().timeIntervalSince(lastFullSweepTime) >= fullSweepInterval {
-                // Time for a full sweep
-                isDoingFullSweep = true
-                fullSweepCommandIndex = 0
-                command = fetchCommands[fullSweepCommandIndex]
-                fullSweepCommandIndex += 1
-                logger.log(.info, "Starting full sweep (5 min interval)")
-            } else {
-                // Fast mode: just send the current PID (header already set to 7E1)
-                command = fastCommand
-            }
-        } else {
-            // Normal mode: round-robin through all commands
-            command = fetchCommands[currentCommandIndex]
-            currentCommandIndex = (currentCommandIndex + 1) % fetchCommands.count
+        // Build next cycle's queue when current one is exhausted
+        if currentQueueIndex >= currentCommandQueue.count {
+            cycleCount += 1
+            currentCommandQueue = buildCommandQueue()
+            currentQueueIndex = 0
         }
 
-        let data = (command + "\r").data(using: .utf8)!
+        guard currentQueueIndex < currentCommandQueue.count else { return }
 
+        let command = currentCommandQueue[currentQueueIndex]
+        currentQueueIndex += 1
+
+        let data = (command + "\r").data(using: .utf8)!
         logger.log(.verbose, "Sending: \(command)")
         connection.writeData(data)
         isWaitingForResponse = true
 
+        startResponseTimeout(for: command)
+    }
+
+    private func startResponseTimeout(for command: String) {
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
             guard let self = self else { return }
             if self.isWaitingForResponse {
@@ -240,17 +228,17 @@ class OBD2Controller: ObservableObject {
             }
         }
     }
-    
+
     private func handleReceivedData(_ data: Data) {
         if logger.logLevel == .verbose {
             logger.log(.data, "Raw: \(data.map { String(format: "%02X", $0) }.joined(separator: " "))")
         }
-        
+
         guard let chunk = String(data: data, encoding: .utf8) else {
             logger.log(.error, "Could not decode data")
             return
         }
-        
+
         // Handle init responses
         if isInitializing {
             responseBuffer.append(chunk)
@@ -261,15 +249,15 @@ class OBD2Controller: ObservableObject {
             }
             return
         }
-        
+
         isWaitingForResponse = false
-        
+
         let text = chunk.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else {
             logger.log(.verbose, "Empty response")
             return
         }
-        
+
         // Parse the response and update vehicle data
         if let result = parser.parseResponse(text) {
             DispatchQueue.main.async { [weak self] in
@@ -279,7 +267,7 @@ class OBD2Controller: ObservableObject {
             }
         }
     }
-    
+
     private func updateVehicleData(with result: OBD2ParseResult) {
         switch result {
         case .speed(let speed):
@@ -287,13 +275,10 @@ class OBD2Controller: ObservableObject {
             vehicleData.updateEfficiency()
         case .longdistance(let longdistance):
             vehicleData.longdistance = longdistance
-            
-            // Set initial distance on first reading
             if initialLongDistance == nil {
                 initialLongDistance = longdistance
                 vehicleData.relativeDistance = 0.0
             } else {
-                // Calculate relative distance from initial reading
                 vehicleData.relativeDistance = longdistance - (initialLongDistance ?? 0)
             }
         case .batteryCurrent(let current):
@@ -306,11 +291,30 @@ class OBD2Controller: ObservableObject {
             vehicleData.stateOfCharge = soc
         case .ambientTemperature(let fahrenheit):
             vehicleData.ambientTempF = fahrenheit
+        case .socHD(let soc):
+            vehicleData.socHD = soc
+        case .batteryAvgTemp(let tempC):
+            vehicleData.batteryAvgTempC = tempC
+        case .batteryMaxTemp(let tempC):
+            vehicleData.batteryMaxTempC = tempC
+        case .batteryMinTemp(let tempC):
+            vehicleData.batteryMinTempC = tempC
+        case .batteryCoolantTemp(let tempC):
+            vehicleData.batteryCoolantTempC = tempC
+        case .hvacMeasuredPower(let watts):
+            vehicleData.hvacMeasuredPowerW = watts
+        case .hvacCommandedPower(let watts):
+            vehicleData.hvacCommandedPowerW = watts
+        case .acCompressorOn(let isOn):
+            vehicleData.acCompressorOn = isOn
+        case .batteryCapacityAh(let ah):
+            vehicleData.batteryCapacityAh = ah
+        case .batteryResistance(let mOhm):
+            vehicleData.batteryResistanceMOhm = mOhm
         }
     }
-    
+
     private func updateDataPoint(with result: OBD2ParseResult) {
-        // Update the current data point with each parsed result
         switch result {
         case .speed(let speed):
             currentDataPoint.speedKmh = Int(speed * 1.60934) // Convert mph to km/h
@@ -324,22 +328,40 @@ class OBD2Controller: ObservableObject {
             currentDataPoint.distanceMi = longdistance
         case .ambientTemperature(let fahrenheit):
             currentDataPoint.ambientTempF = fahrenheit
+        case .socHD(let soc):
+            currentDataPoint.socHD = soc
+        case .batteryAvgTemp(let tempC):
+            currentDataPoint.batteryAvgTempC = tempC
+        case .batteryMaxTemp(let tempC):
+            currentDataPoint.batteryMaxTempC = tempC
+        case .batteryMinTemp(let tempC):
+            currentDataPoint.batteryMinTempC = tempC
+        case .batteryCoolantTemp(let tempC):
+            currentDataPoint.batteryCoolantTempC = tempC
+        case .hvacMeasuredPower(let watts):
+            currentDataPoint.hvacMeasuredPowerW = watts
+        case .hvacCommandedPower(let watts):
+            currentDataPoint.hvacCommandedPowerW = watts
+        case .acCompressorOn(let isOn):
+            currentDataPoint.acCompressorOn = isOn
+        case .batteryCapacityAh(let ah):
+            currentDataPoint.batteryCapacityAh = ah
+        case .batteryResistance(let mOhm):
+            currentDataPoint.batteryResistanceMOhm = mOhm
         }
-        
-        // Save data point periodically (based on timer duration and command count)
-        let commandCount = (fastPollingEnabled && !isDoingFullSweep) ? 1 : fetchCommands.count
-        let saveInterval = dataTimerDuration * Double(commandCount) * 1.2
+
+        // Save data point periodically
+        let saveInterval = dataTimerDuration * Double(max(currentCommandQueue.count, 1)) * 1.2
         if Date().timeIntervalSince(currentDataPoint.timestamp) >= saveInterval {
             saveCurrentDataPoint()
         }
     }
-    
+
     private func saveCurrentDataPoint() {
         guard let dataStore = dataStore else { return }
-        
-        // Create a new data point with current timestamp
+
         let dataPointToSave = currentDataPoint
-        
+
         // Only save if we have at least some data
         if dataPointToSave.speedKmh != nil ||
            dataPointToSave.currentAmps != nil ||
@@ -348,33 +370,31 @@ class OBD2Controller: ObservableObject {
             dataStore.saveDataPoint(dataPointToSave)
             logger.log(.verbose, "Saved data point to local storage")
         }
-        
+
         // Reset for next interval
         currentDataPoint = VehicleDataPoint(timestamp: Date())
     }
-    
+
     func resetDistance() {
         DispatchQueue.main.async {
-            // Reset the baseline to current longdistance reading
             self.initialLongDistance = self.vehicleData.longdistance
             self.vehicleData.relativeDistance = 0.0
         }
         logger.log(.info, "Distance reset to zero")
     }
-    
+
     private func stopAllTimers() {
         [dataTimer, initResponseTimer].forEach { $0?.invalidate() }
         dataTimer = nil
         initResponseTimer = nil
         isWaitingForResponse = false
         isInitializing = false
-        
+
         // Save any pending data
         saveCurrentDataPoint()
     }
-    
+
     deinit {
         stopAllTimers()
     }
 }
-

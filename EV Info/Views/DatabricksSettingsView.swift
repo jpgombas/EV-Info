@@ -69,13 +69,6 @@ struct DatabricksSettingsView: View {
                         }
                     }
 
-                    Toggle("Fast Polling (Current Only)", isOn: $obd2Controller.fastPollingEnabled)
-
-                    if obd2Controller.fastPollingEnabled {
-                        Text("Polls current every tick. SOC, voltage, temp, and distance polled every 5 min.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
                 }
                 
                 Section(header: Text("Status")) {
