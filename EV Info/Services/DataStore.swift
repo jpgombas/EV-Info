@@ -125,8 +125,8 @@ class DataStore: ObservableObject {
     func loadRecentDataPoints() {
         let fetchRequest: NSFetchRequest<VehicleDataEntity> = VehicleDataEntity.fetchRequest()
         fetchRequest.sortDescriptors = [NSSortDescriptor(key: "timestamp", ascending: false)]
-        fetchRequest.fetchLimit = 100
-        
+        fetchRequest.fetchLimit = Constants.DataStore.recentDataPointsLimit
+
         do {
             let entities = try context.fetch(fetchRequest)
             DispatchQueue.main.async {

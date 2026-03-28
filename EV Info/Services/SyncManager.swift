@@ -16,14 +16,13 @@ class SyncManager: ObservableObject {
     // MARK: - Private Properties
     private let dataStore: DataStore
     private var syncTimer: Timer?
-    private let autoSyncInterval: TimeInterval = 300 // 5 minute
     let networkMonitor = NetworkMonitor()
     private var cancellables = Set<AnyCancellable>()
     
     // Settings
     var autoSyncEnabled: Bool {
         didSet {
-            UserDefaults.standard.set(autoSyncEnabled, forKey: "autoSyncEnabled")
+            UserDefaults.standard.set(autoSyncEnabled, forKey: UserDefaultsKey.autoSyncEnabled)
             if autoSyncEnabled {
                 startAutoSync()
             } else {
@@ -34,19 +33,19 @@ class SyncManager: ObservableObject {
     
     @Published var syncOnlyOnWiFi: Bool {
         didSet {
-            UserDefaults.standard.set(syncOnlyOnWiFi, forKey: "syncOnlyOnWiFi")
+            UserDefaults.standard.set(syncOnlyOnWiFi, forKey: UserDefaultsKey.syncOnlyOnWiFi)
         }
     }
     
     @Published var batchSize = 40 {
         didSet {
-            UserDefaults.standard.set(batchSize, forKey: "syncBatchSize")
+            UserDefaults.standard.set(batchSize, forKey: UserDefaultsKey.syncBatchSize)
         }
     }
     
     @Published var uploadMethod: UploadMethod {
         didSet {
-            UserDefaults.standard.set(uploadMethod.rawValue, forKey: "uploadMethod")
+            UserDefaults.standard.set(uploadMethod.rawValue, forKey: UserDefaultsKey.uploadMethod)
         }
     }
     
@@ -62,11 +61,11 @@ class SyncManager: ObservableObject {
         self.dataStore = dataStore
         
         // Load settings
-        self.autoSyncEnabled = UserDefaults.standard.bool(forKey: "autoSyncEnabled")
-        self.syncOnlyOnWiFi = UserDefaults.standard.bool(forKey: "syncOnlyOnWiFi")
-        self.batchSize = UserDefaults.standard.integer(forKey: "syncBatchSize")
+        self.autoSyncEnabled = UserDefaults.standard.bool(forKey: UserDefaultsKey.autoSyncEnabled)
+        self.syncOnlyOnWiFi = UserDefaults.standard.bool(forKey: UserDefaultsKey.syncOnlyOnWiFi)
+        self.batchSize = UserDefaults.standard.integer(forKey: UserDefaultsKey.syncBatchSize)
         
-        if let methodString = UserDefaults.standard.string(forKey: "uploadMethod"),
+        if let methodString = UserDefaults.standard.string(forKey: UserDefaultsKey.uploadMethod),
            let method = UploadMethod(rawValue: methodString) {
             self.uploadMethod = method
         } else {
@@ -75,16 +74,16 @@ class SyncManager: ObservableObject {
         
         // Default values
         if batchSize == 0 {
-            batchSize = 100
+            batchSize = Constants.Sync.defaultBatchSize
         }
         
         // Load last sync time
-        if let timestamp = UserDefaults.standard.object(forKey: "lastSyncTime") as? Date {
+        if let timestamp = UserDefaults.standard.object(forKey: UserDefaultsKey.lastSyncTime) as? Date {
             self.lastSyncTime = timestamp
         }
         
         // Load total synced records count
-        self.totalSyncedRecords = UserDefaults.standard.integer(forKey: "totalSyncedRecords")
+        self.totalSyncedRecords = UserDefaults.standard.integer(forKey: UserDefaultsKey.totalSyncedRecords)
         
         // Start auto sync if enabled
         if autoSyncEnabled {
@@ -119,7 +118,7 @@ class SyncManager: ObservableObject {
     func startAutoSync() {
         stopAutoSync() // Stop any existing timer
         
-        syncTimer = Timer.scheduledTimer(withTimeInterval: autoSyncInterval, repeats: true) { [weak self] _ in
+        syncTimer = Timer.scheduledTimer(withTimeInterval: Constants.Sync.autoSyncInterval, repeats: true) { [weak self] _ in
             Task {
                 await self?.performSync()
             }
@@ -209,7 +208,7 @@ class SyncManager: ObservableObject {
                 await MainActor.run {
                     totalSyncedRecords = newTotal
                     // Persist the total count
-                    UserDefaults.standard.set(newTotal, forKey: "totalSyncedRecords")
+                    UserDefaults.standard.set(newTotal, forKey: UserDefaultsKey.totalSyncedRecords)
                 }
                 
                 await finishSync(success: true, error: nil)
@@ -218,7 +217,7 @@ class SyncManager: ObservableObject {
                 let remainingRecords = updatePendingCount()
                 if remainingRecords > 0 {
                     // Small delay before next batch
-                    try? await Task.sleep(nanoseconds: 2_000_000_000) // 2 seconds
+                    try? await Task.sleep(nanoseconds: Constants.Sync.interBatchDelayNanoseconds)
                     await performSync()
                 }
             } else {
@@ -247,7 +246,7 @@ class SyncManager: ObservableObject {
             
             if success {
                 lastSyncTime = Date()
-                UserDefaults.standard.set(lastSyncTime, forKey: "lastSyncTime")
+                UserDefaults.standard.set(lastSyncTime, forKey: UserDefaultsKey.lastSyncTime)
                 lastSyncError = nil
             } else {
                 lastSyncError = error

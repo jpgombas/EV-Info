@@ -198,7 +198,7 @@ struct DatabricksSettingsView: View {
     }
     
     private func loadConfiguration() {
-        if let savedURL = UserDefaults.standard.string(forKey: "databricksWorkspaceURL") {
+        if let savedURL = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksWorkspaceURL) {
             workspaceURL = savedURL
         }
         
@@ -206,25 +206,25 @@ struct DatabricksSettingsView: View {
             accessToken = token
         }
         
-        if let savedPath = UserDefaults.standard.string(forKey: "databricksVolumePath") {
+        if let savedPath = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksVolumePath) {
             volumePath = savedPath
         }
         
-        if let savedWarehouse = UserDefaults.standard.string(forKey: "databricksSQLWarehouseID") {
+        if let savedWarehouse = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksSQLWarehouseID) {
             sqlWarehouseID = savedWarehouse
         }
         
-        if let savedTable = UserDefaults.standard.string(forKey: "databricksTableName") {
+        if let savedTable = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksTableName) {
             tableName = savedTable
         }
     }
     
     private func saveConfiguration() {
-        UserDefaults.standard.set(workspaceURL, forKey: "databricksWorkspaceURL")
+        UserDefaults.standard.set(workspaceURL, forKey: UserDefaultsKey.databricksWorkspaceURL)
         let tokenSaved = keychain.saveToken(accessToken, for: "databricksAccessToken")
-        UserDefaults.standard.set(volumePath, forKey: "databricksVolumePath")
-        UserDefaults.standard.set(sqlWarehouseID, forKey: "databricksSQLWarehouseID")
-        UserDefaults.standard.set(tableName, forKey: "databricksTableName")
+        UserDefaults.standard.set(volumePath, forKey: UserDefaultsKey.databricksVolumePath)
+        UserDefaults.standard.set(sqlWarehouseID, forKey: UserDefaultsKey.databricksSQLWarehouseID)
+        UserDefaults.standard.set(tableName, forKey: UserDefaultsKey.databricksTableName)
         
         // Update SyncManager with new configuration only if token was saved successfully
         if tokenSaved {

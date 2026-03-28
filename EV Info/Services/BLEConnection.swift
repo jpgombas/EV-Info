@@ -23,8 +23,7 @@ class BLEConnection: NSObject, ObservableObject {
     @Published var connectionStatus = "Disconnected"
     
     // Device configuration
-    private let targetDeviceName = "VEEPEAK"
-    private var targetDeviceUUID: UUID?
+    private let targetDeviceName = Constants.BLE.targetDeviceName
     
     // Callbacks
     var onDataReceived: ((Data) -> Void)?
@@ -133,7 +132,6 @@ extension BLEConnection: CBCentralManagerDelegate {
         
         if isOBD2Device {
             logger.log(.success, "Found OBD2 device: \(deviceName)")
-            self.targetDeviceUUID = peripheral.identifier
             self.peripheral = peripheral
             peripheral.delegate = self
             centralManager.connect(peripheral, options: nil)

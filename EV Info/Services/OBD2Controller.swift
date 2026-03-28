@@ -25,7 +25,7 @@ class OBD2Controller: ObservableObject {
     private var isInitializing = false
     private var initialLongDistance: Double?  // Track starting distance for relative calculation
 
-    @Published var dataTimerDuration = 0.8 {
+    @Published var dataTimerDuration = Constants.OBD2.defaultDataTimerDuration {
         didSet {
             if dataTimer != nil {
                 restartDataTimer()
@@ -38,9 +38,7 @@ class OBD2Controller: ObservableObject {
 
     // Tiered polling cycle tracking
     private var cycleCount = 0
-    private let slowCycleInterval = 10  // Run slow tier every 5th cycle
     private var lastTripPollTime = Date.distantPast  // Force trip poll on first cycle
-    private let tripPollInterval: TimeInterval = 600  // 10 minutes
 
     // Current command queue for this cycle
     private var currentCommandQueue: [String] = []
@@ -118,7 +116,7 @@ class OBD2Controller: ObservableObject {
         connection.writeData(data)
 
         initResponseTimer?.invalidate()
-        initResponseTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { [weak self] _ in
+        initResponseTimer = Timer.scheduledTimer(withTimeInterval: Constants.OBD2.initTimeoutSeconds, repeats: false) { [weak self] _ in
             self?.logger.log(.warning, "Init timeout: \(command)")
             self?.continueInitSequence()
         }
@@ -131,11 +129,11 @@ class OBD2Controller: ObservableObject {
         if initCommandIndex >= initCommands.count {
             isInitializing = false
             logger.log(.success, "Initialization complete - starting data fetch")
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + Constants.OBD2.postInitDelay) { [weak self] in
                 self?.startDataFetching()
             }
         } else {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + Constants.OBD2.interInitCommandDelay) { [weak self] in
                 self?.sendNextInitCommand()
             }
         }
@@ -146,11 +144,11 @@ class OBD2Controller: ObservableObject {
     private func buildCommandQueue() -> [String] {
         var commands = fastCommands
 
-        if cycleCount % slowCycleInterval == 0 {
+        if cycleCount % Constants.OBD2.slowCycleInterval == 0 {
             commands += slowCommands
         }
 
-        if Date().timeIntervalSince(lastTripPollTime) >= tripPollInterval {
+        if Date().timeIntervalSince(lastTripPollTime) >= Constants.OBD2.tripPollInterval {
             commands += tripCommands
             lastTripPollTime = Date()
         }
@@ -220,7 +218,7 @@ class OBD2Controller: ObservableObject {
     }
 
     private func startResponseTimeout(for command: String) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.5) { [weak self] in
+        DispatchQueue.main.asyncAfter(deadline: .now() + Constants.OBD2.responseTimeoutSeconds) { [weak self] in
             guard let self = self else { return }
             if self.isWaitingForResponse {
                 self.logger.log(.warning, "Response timeout: \(command)")
@@ -242,6 +240,11 @@ class OBD2Controller: ObservableObject {
         // Handle init responses
         if isInitializing {
             responseBuffer.append(chunk)
+            if responseBuffer.count > Constants.OBD2.maxResponseBufferSize {
+                logger.log(.warning, "Response buffer overflow — resetting")
+                responseBuffer = ""
+                return
+            }
             if responseBuffer.contains(">") {
                 logger.log(.verbose, "Init response: \(responseBuffer.trimmingCharacters(in: .whitespacesAndNewlines))")
                 continueInitSequence()
@@ -262,17 +265,17 @@ class OBD2Controller: ObservableObject {
         if let result = parser.parseResponse(text) {
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                self.updateVehicleData(with: result)
-                self.updateDataPoint(with: result)
+                self.applyResult(result)
             }
         }
     }
 
-    private func updateVehicleData(with result: OBD2ParseResult) {
+    private func applyResult(_ result: OBD2ParseResult) {
         switch result {
         case .speed(let speed):
             vehicleData.speed = speed
             vehicleData.updateEfficiency()
+            currentDataPoint.speedKmh = Int(speed * 1.60934)
         case .longdistance(let longdistance):
             vehicleData.longdistance = longdistance
             if initialLongDistance == nil {
@@ -281,72 +284,50 @@ class OBD2Controller: ObservableObject {
             } else {
                 vehicleData.relativeDistance = longdistance - (initialLongDistance ?? 0)
             }
+            currentDataPoint.distanceMi = longdistance
         case .batteryCurrent(let current):
             vehicleData.batteryCurrent = current
             vehicleData.updatePowerAndEfficiency()
+            currentDataPoint.currentAmps = current
         case .voltage(let voltage):
             vehicleData.voltage = voltage
             vehicleData.updatePowerAndEfficiency()
-        case .stateOfCharge(let soc):
-            vehicleData.stateOfCharge = soc
-        case .ambientTemperature(let fahrenheit):
-            vehicleData.ambientTempF = fahrenheit
-        case .socHD(let soc):
-            vehicleData.socHD = soc
-        case .batteryAvgTemp(let tempC):
-            vehicleData.batteryAvgTempC = tempC
-        case .batteryMaxTemp(let tempC):
-            vehicleData.batteryMaxTempC = tempC
-        case .batteryMinTemp(let tempC):
-            vehicleData.batteryMinTempC = tempC
-        case .batteryCoolantTemp(let tempC):
-            vehicleData.batteryCoolantTempC = tempC
-        case .hvacMeasuredPower(let watts):
-            vehicleData.hvacMeasuredPowerW = watts
-        case .hvacCommandedPower(let watts):
-            vehicleData.hvacCommandedPowerW = watts
-        case .acCompressorOn(let isOn):
-            vehicleData.acCompressorOn = isOn
-        case .batteryCapacityAh(let ah):
-            vehicleData.batteryCapacityAh = ah
-        case .batteryResistance(let mOhm):
-            vehicleData.batteryResistanceMOhm = mOhm
-        }
-    }
-
-    private func updateDataPoint(with result: OBD2ParseResult) {
-        switch result {
-        case .speed(let speed):
-            currentDataPoint.speedKmh = Int(speed * 1.60934) // Convert mph to km/h
-        case .batteryCurrent(let current):
-            currentDataPoint.currentAmps = current
-        case .voltage(let voltage):
             currentDataPoint.voltageVolts = voltage
         case .stateOfCharge(let soc):
+            vehicleData.stateOfCharge = soc
             currentDataPoint.soc = soc
-        case .longdistance(let longdistance):
-            currentDataPoint.distanceMi = longdistance
         case .ambientTemperature(let fahrenheit):
+            vehicleData.ambientTempF = fahrenheit
             currentDataPoint.ambientTempF = fahrenheit
         case .socHD(let soc):
+            vehicleData.socHD = soc
             currentDataPoint.socHD = soc
         case .batteryAvgTemp(let tempC):
+            vehicleData.batteryAvgTempC = tempC
             currentDataPoint.batteryAvgTempC = tempC
         case .batteryMaxTemp(let tempC):
+            vehicleData.batteryMaxTempC = tempC
             currentDataPoint.batteryMaxTempC = tempC
         case .batteryMinTemp(let tempC):
+            vehicleData.batteryMinTempC = tempC
             currentDataPoint.batteryMinTempC = tempC
         case .batteryCoolantTemp(let tempC):
+            vehicleData.batteryCoolantTempC = tempC
             currentDataPoint.batteryCoolantTempC = tempC
         case .hvacMeasuredPower(let watts):
+            vehicleData.hvacMeasuredPowerW = watts
             currentDataPoint.hvacMeasuredPowerW = watts
         case .hvacCommandedPower(let watts):
+            vehicleData.hvacCommandedPowerW = watts
             currentDataPoint.hvacCommandedPowerW = watts
         case .acCompressorOn(let isOn):
+            vehicleData.acCompressorOn = isOn
             currentDataPoint.acCompressorOn = isOn
         case .batteryCapacityAh(let ah):
+            vehicleData.batteryCapacityAh = ah
             currentDataPoint.batteryCapacityAh = ah
         case .batteryResistance(let mOhm):
+            vehicleData.batteryResistanceMOhm = mOhm
             currentDataPoint.batteryResistanceMOhm = mOhm
         }
 

@@ -65,7 +65,7 @@ class DatabricksClient {
             throw DatabricksError.invalidConfiguration
         }
 
-        let insertSQL = generateInsertSQL(data: data, tableName: tableName)
+        let insertSQL = try generateInsertSQL(data: data, tableName: tableName)
 
         let url = URL(string: "\(config.workspaceURL)/api/2.0/sql/statements")!
         var request = URLRequest(url: url)
@@ -154,7 +154,20 @@ class DatabricksClient {
         return csv
     }
 
-    private func generateInsertSQL(data: [VehicleDataPoint], tableName: String) -> String {
+    /// Validate that a table name contains only safe characters (alphanumeric, underscores, dots, hyphens)
+    private func sanitizedTableName(_ name: String) -> String? {
+        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "_.-"))
+        guard !name.isEmpty, name.unicodeScalars.allSatisfy({ allowed.contains($0) }) else {
+            return nil
+        }
+        return name
+    }
+
+    private func generateInsertSQL(data: [VehicleDataPoint], tableName: String) throws -> String {
+        guard let safeName = sanitizedTableName(tableName) else {
+            throw DatabricksError.invalidConfiguration
+        }
+
         let formatter = ISO8601DateFormatter()
 
         let values = data.map { dataPoint -> String in
@@ -170,7 +183,7 @@ class DatabricksClient {
         }.joined(separator: ",\n")
 
         return """
-        INSERT INTO \(tableName)
+        INSERT INTO \(safeName)
         (timestamp, soc, speed_kmh, current_amps, voltage_volts, distance_mi, ambient_temp_f)
         VALUES
         \(values)

@@ -176,112 +176,69 @@ class OBD2Parser {
         return .socHD(soc)
     }
 
-    // MARK: - Battery Avg Temperature (22434F → 62434F, 1 byte, A-40 °C)
+    // MARK: - Temperature Parsing (1 byte, A-40 °C)
+    // Shared helper for battery avg/max/min/coolant temps — all use the same A-40 formula
+
+    private func parseTemperatureCelsius(_ cleanText: String, pattern: String, label: String) -> Double? {
+        guard let range = cleanText.range(of: pattern) else { return nil }
+        let afterPattern = String(cleanText[range.upperBound...])
+
+        let hexParts = extractHexParts(from: afterPattern)
+        guard hexParts.count >= 1,
+              let A = Int(hexParts[0], radix: 16) else {
+            logger.log(.warning, "Failed to parse \(label)")
+            return nil
+        }
+
+        let tempC = Double(A) - 40.0
+        logger.log(.data, "\(label): \(String(format: "%.0f", tempC)) °C")
+        return tempC
+    }
+
     private func parseBatteryAvgTemp(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "62434F") else { return nil }
-        let afterPattern = String(cleanText[range.upperBound...])
-
-        let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 1,
-              let A = Int(hexParts[0], radix: 16) else {
-            logger.log(.warning, "Failed to parse battery avg temp")
-            return nil
-        }
-
-        let tempC = Double(A) - 40.0
-        logger.log(.data, "Batt Avg Temp: \(String(format: "%.0f", tempC)) °C")
-        return .batteryAvgTemp(tempC)
+        parseTemperatureCelsius(cleanText, pattern: "62434F", label: "Batt Avg Temp").map { .batteryAvgTemp($0) }
     }
 
-    // MARK: - Battery Max Temperature (224349 → 624349, 1 byte, A-40 °C)
     private func parseBatteryMaxTemp(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "624349") else { return nil }
-        let afterPattern = String(cleanText[range.upperBound...])
-
-        let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 1,
-              let A = Int(hexParts[0], radix: 16) else {
-            logger.log(.warning, "Failed to parse battery max temp")
-            return nil
-        }
-
-        let tempC = Double(A) - 40.0
-        logger.log(.data, "Batt Max Temp: \(String(format: "%.0f", tempC)) °C")
-        return .batteryMaxTemp(tempC)
+        parseTemperatureCelsius(cleanText, pattern: "624349", label: "Batt Max Temp").map { .batteryMaxTemp($0) }
     }
 
-    // MARK: - Battery Min Temperature (22434A → 62434A, 1 byte, A-40 °C)
     private func parseBatteryMinTemp(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "62434A") else { return nil }
-        let afterPattern = String(cleanText[range.upperBound...])
-
-        let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 1,
-              let A = Int(hexParts[0], radix: 16) else {
-            logger.log(.warning, "Failed to parse battery min temp")
-            return nil
-        }
-
-        let tempC = Double(A) - 40.0
-        logger.log(.data, "Batt Min Temp: \(String(format: "%.0f", tempC)) °C")
-        return .batteryMinTemp(tempC)
+        parseTemperatureCelsius(cleanText, pattern: "62434A", label: "Batt Min Temp").map { .batteryMinTemp($0) }
     }
 
-    // MARK: - Battery Coolant Temperature (2241A4 → 6241A4, 1 byte, A-40 °C)
     private func parseBatteryCoolantTemp(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "6241A4") else { return nil }
+        parseTemperatureCelsius(cleanText, pattern: "6241A4", label: "Coolant Temp").map { .batteryCoolantTemp($0) }
+    }
+
+    // MARK: - HVAC Power Parsing (2 bytes, Signed(A)*256+B watts)
+    // Shared helper for measured and commanded HVAC power
+
+    private func parseSignedTwoByteWatts(_ cleanText: String, pattern: String, label: String) -> Double? {
+        guard let range = cleanText.range(of: pattern) else { return nil }
         let afterPattern = String(cleanText[range.upperBound...])
 
         let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 1,
-              let A = Int(hexParts[0], radix: 16) else {
-            logger.log(.warning, "Failed to parse battery coolant temp")
+        guard hexParts.count >= 2,
+              let A = Int(hexParts[0], radix: 16),
+              let B = Int(hexParts[1], radix: 16) else {
+            logger.log(.warning, "Failed to parse \(label)")
             return nil
         }
 
-        let tempC = Double(A) - 40.0
-        logger.log(.data, "Coolant Temp: \(String(format: "%.0f", tempC)) °C")
-        return .batteryCoolantTemp(tempC)
+        let signedA = A < 128 ? A : A - 256
+        let watts = Double(signedA * 256 + B)
+
+        logger.log(.data, "\(label): \(Int(watts)) W")
+        return watts
     }
 
-    // MARK: - HVAC Measured Power (2241B2 → 6241B2, 2 bytes, Signed(A)*256+B watts)
     private func parseHVACMeasuredPower(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "6241B2") else { return nil }
-        let afterPattern = String(cleanText[range.upperBound...])
-
-        let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 2,
-              let A = Int(hexParts[0], radix: 16),
-              let B = Int(hexParts[1], radix: 16) else {
-            logger.log(.warning, "Failed to parse HVAC measured power")
-            return nil
-        }
-
-        let signedA = A < 128 ? A : A - 256
-        let watts = Double(signedA * 256 + B)
-
-        logger.log(.data, "HVAC Measured: \(Int(watts)) W")
-        return .hvacMeasuredPower(watts)
+        parseSignedTwoByteWatts(cleanText, pattern: "6241B2", label: "HVAC Measured").map { .hvacMeasuredPower($0) }
     }
 
-    // MARK: - HVAC Commanded Power (2241B1 → 6241B1, 2 bytes, Signed(A)*256+B watts)
     private func parseHVACCommandedPower(_ cleanText: String) -> OBD2ParseResult? {
-        guard let range = cleanText.range(of: "6241B1") else { return nil }
-        let afterPattern = String(cleanText[range.upperBound...])
-
-        let hexParts = extractHexParts(from: afterPattern)
-        guard hexParts.count >= 2,
-              let A = Int(hexParts[0], radix: 16),
-              let B = Int(hexParts[1], radix: 16) else {
-            logger.log(.warning, "Failed to parse HVAC commanded power")
-            return nil
-        }
-
-        let signedA = A < 128 ? A : A - 256
-        let watts = Double(signedA * 256 + B)
-
-        logger.log(.data, "HVAC Commanded: \(Int(watts)) W")
-        return .hvacCommandedPower(watts)
+        parseSignedTwoByteWatts(cleanText, pattern: "6241B1", label: "HVAC Commanded").map { .hvacCommandedPower($0) }
     }
 
     // MARK: - A/C Compressor On/Off (22451F → 62451F, 1 byte, A-1 → bool)
