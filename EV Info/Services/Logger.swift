@@ -12,7 +12,7 @@ class Logger: ObservableObject {
     @Published var messages: [DebugMessage] = []
     @Published var logLevel: LogLevel = .info
     
-    private let maxMessages = 30
+    private let maxMessages = Constants.Logger.maxMessages
     
     func log(_ level: LogLevel, _ message: String, forceShow: Bool = false) {
         let shouldShow = forceShow ||

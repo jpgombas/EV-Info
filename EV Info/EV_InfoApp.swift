@@ -17,12 +17,12 @@ struct EV_InfoApp: App {
         _dataStore = StateObject(wrappedValue: dataStore)
 
         // Load Databricks configuration from UserDefaults
-        let workspaceURL = UserDefaults.standard.string(forKey: "databricksWorkspaceURL") ?? ""
+        let workspaceURL = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksWorkspaceURL) ?? ""
         let keychain = DatabricksKeychain()
         let accessToken = keychain.loadToken(for: "databricksAccessToken") ?? ""
-        let volumePath = UserDefaults.standard.string(forKey: "databricksVolumePath")
-        let sqlWarehouseID = UserDefaults.standard.string(forKey: "databricksSQLWarehouseID")
-        let tableName = UserDefaults.standard.string(forKey: "databricksTableName")
+        let volumePath = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksVolumePath)
+        let sqlWarehouseID = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksSQLWarehouseID)
+        let tableName = UserDefaults.standard.string(forKey: UserDefaultsKey.databricksTableName)
 
         let config = DatabricksClient.Config(
             workspaceURL: workspaceURL,
