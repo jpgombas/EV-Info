@@ -23,7 +23,7 @@ SCHEMA_SILVER = "silver"
 SCHEMA_GOLD = "gold"
 
 # Volume path where iOS app uploads CSV/JSON files
-VOLUME_PATH = f"/Volumes/{CATALOG}/{SCHEMA_BRONZE}/raw_uploads"
+VOLUME_PATH = f"/Volumes/vehicle_data/telemetry/uploads/incoming_csv"
 
 # COMMAND ----------
 
@@ -123,7 +123,7 @@ csv_stream = (
     spark.readStream
     .format("cloudFiles")
     .option("cloudFiles.format", "csv")
-    .option("cloudFiles.schemaLocation", f"{VOLUME_PATH}/_csv_schema")
+    .option("cloudFiles.schemaLocation", f"{VOLUME_PATH}/_schemas")
     .option("header", "true")
     .option("inferSchema", "false")
     .schema(csv_schema)
@@ -131,14 +131,14 @@ csv_stream = (
     .withColumn("timestamp", F.to_timestamp("timestamp"))
     .withColumn("id", F.expr("uuid()"))
     .withColumn("_ingested_at", F.current_timestamp())
-    .withColumn("_source_file", F.input_file_name())
+    .withColumn("_source_file", F.col("_metadata.file_path"))
 )
 
 (
     csv_stream.writeStream
     .format("delta")
     .outputMode("append")
-    .option("checkpointLocation", f"{VOLUME_PATH}/_csv_checkpoint")
+    .option("checkpointLocation", f"{VOLUME_PATH}/_checkpoints")
     .option("mergeSchema", "true")
     .trigger(availableNow=True)
     .toTable("ev_telemetry.bronze.raw_vehicle_data")
@@ -178,7 +178,7 @@ json_stream = (
         F.col("battery_resistance_mohm").cast("double"),
     )
     .withColumn("_ingested_at", F.current_timestamp())
-    .withColumn("_source_file", F.input_file_name())
+    .withColumn("_source_file", F.col("_metadata.file_path"))
 )
 
 (
